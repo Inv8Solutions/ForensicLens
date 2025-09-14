@@ -360,6 +360,10 @@
 		.fl-ghost { background: transparent; border: 1px solid #555; color: #fff; }
 		.fl-primary { background: #ff3b3f; color: #fff; }
 	</style>
+	<style>
+        /* Canvas photo styling */
+        #photo-canvas { width: 100%; height: 100%; display: block; }
+    </style>
 		<style>
 			/* Buttons under settings */
 			.controls-btns { display:flex; gap:12px; justify-content: space-between; margin-top: 6px; }
@@ -392,31 +396,277 @@
 
 			// Reset and Submit handlers
 			document.addEventListener('DOMContentLoaded', ()=>{
-				const resetBtn = document.getElementById('resetBtn');
-				const submitBtn = document.getElementById('submitBtn');
-				if(resetBtn) {
-					resetBtn.addEventListener('click', ()=>{
-						// reset sliders to defaults
-						document.getElementById('iso-slider').value = 600;
-						document.getElementById('aperture-slider').value = 8;
-						document.getElementById('shutter-slider').value = 125;
-						// update displayed values if present
-						const isoVal = document.getElementById('iso-val'); if(isoVal) isoVal.textContent = '600';
-						const appVal = document.getElementById('aperture-val'); if(appVal) appVal.textContent = 'f/8';
-						const shVal = document.getElementById('shutter-val'); if(shVal) shVal.textContent = '1/125';
-						showToast('Settings reset');
-					});
+				// wire modal action buttons
+				document.getElementById('fl-try').addEventListener('click', ()=>{ closeResultModal(); });
+				document.getElementById('fl-next').addEventListener('click', ()=>{ window.location.href = '../practice-levels.html'; });
+
+				// Image render pipeline (real-time)
+				const img = document.getElementById('source-image');
+				const canvas = document.getElementById('photo-canvas');
+				const gl = (() => canvas.getContext('webgl2') || canvas.getContext('webgl'))();
+				let raf = null;
+
+				function fitCanvas(){
+					const rect = canvas.parentElement.getBoundingClientRect();
+					canvas.width = Math.round(rect.width);
+					canvas.height = Math.round(rect.height);
 				}
-				if(submitBtn) {
-					submitBtn.addEventListener('click', ()=>{
-						const payload = {
-							iso: document.getElementById('iso-slider')?.value,
-							aperture: document.getElementById('aperture-slider')?.value,
-							shutter: document.getElementById('shutter-slider')?.value
-						};
-						showToast('Submitted');
-					});
+
+				// Fallback 2D draw if WebGL unavailable
+				const fallbackCtx = !gl ? (canvas.getContext && canvas.getContext('2d')) : null;
+
+				// --- WebGL helpers ---
+				function compileShader(source, type){
+					const sh = gl.createShader(type);
+					gl.shaderSource(sh, source);
+					gl.compileShader(sh);
+					if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+						console.warn('Shader compile error:', gl.getShaderInfoLog(sh));
+						gl.deleteShader(sh);
+						return null;
+					}
+					return sh;
 				}
+
+				function createProgram(vsSrc, fsSrc){
+					const vs = compileShader(vsSrc, gl.VERTEX_SHADER);
+					const fs = compileShader(fsSrc, gl.FRAGMENT_SHADER);
+					const prog = gl.createProgram();
+					gl.attachShader(prog, vs); gl.attachShader(prog, fs);
+					gl.linkProgram(prog);
+					if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){
+						console.warn('Program link error:', gl.getProgramInfoLog(prog));
+						return null;
+					}
+					return prog;
+				}
+
+				function createTextureFromImage(image){
+					const tex = gl.createTexture();
+					gl.bindTexture(gl.TEXTURE_2D, tex);
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+					gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+					gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+					gl.bindTexture(gl.TEXTURE_2D, null);
+					return tex;
+				}
+
+				function createEmptyTexture(w,h){
+					const tex = gl.createTexture();
+					gl.bindTexture(gl.TEXTURE_2D, tex);
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+					gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+					gl.bindTexture(gl.TEXTURE_2D, null);
+					return tex;
+				}
+
+				function createFBO(tex){
+					const fbo = gl.createFramebuffer();
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+					gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+					gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+					return fbo;
+				}
+
+				// Fullscreen quad
+				const vertexSrc = `#version 300 es
+				in vec2 a_pos; in vec2 a_uv; out vec2 v_uv; void main(){ v_uv = a_uv; gl_Position = vec4(a_pos,0.0,1.0);} `;
+
+				const quadPos = new Float32Array([
+					-1, -1, 0, 0,
+					1, -1, 1, 0,
+					-1, 1, 0, 1,
+					1, 1, 1, 1
+				]);
+
+				function setupQuad(){
+					const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+					const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+					gl.bufferData(gl.ARRAY_BUFFER, quadPos, gl.STATIC_DRAW);
+					return {vao, buf};
+				}
+
+				// Simple pass-through fragment shader (WebGL2)
+				const passFs = `#version 300 es
+				precision mediump float; in vec2 v_uv; uniform sampler2D u_tex; out vec4 outColor; void main(){ outColor = texture(u_tex, v_uv); }`;
+
+				// Blur fragment (separable) - will sample 9 taps with offsets multiplied by radius
+				const blurFs = `#version 300 es
+				precision mediump float; in vec2 v_uv; uniform sampler2D u_tex; uniform vec2 u_texel; uniform float u_radius; out vec4 outColor;
+				void main(){ vec2 uv = v_uv; vec4 c = vec4(0.0);
+				float w0 = 0.2270270270;
+				float w1 = 0.3162162162;
+				float w2 = 0.0702702703;
+				vec2 ofs = u_texel * u_radius;
+				c += texture(u_tex, uv) * w0;
+				c += texture(u_tex, uv + ofs) * w1;
+				c += texture(u_tex, uv - ofs) * w1;
+				c += texture(u_tex, uv + ofs*2.0) * w2;
+				c += texture(u_tex, uv - ofs*2.0) * w2;
+				outColor = c;
+				}`;
+
+				// Final shader that applies brightness and noise
+				const finalFs = `#version 300 es
+				precision mediump float; in vec2 v_uv; uniform sampler2D u_tex; uniform float u_brightness; uniform float u_noise; out vec4 outColor;
+				// simple rand
+				float rand(vec2 co){ return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453); }
+				void main(){ vec4 c = texture(u_tex, v_uv);
+				float n = (rand(gl_FragCoord.xy) - 0.5) * u_noise;
+				c.rgb = clamp(c.rgb * u_brightness + n, 0.0, 1.0);
+				outColor = c;
+				}`;
+
+				let programs = null;
+				let quad = null;
+				let srcTex = null, texA = null, texB = null;
+				let fboA = null, fboB = null;
+
+				function initGLResources(){
+					if(!gl) return false;
+					programs = {
+						pass: createProgram(vertexSrc, passFs),
+						blur: createProgram(vertexSrc, blurFs),
+						final: createProgram(vertexSrc, finalFs)
+					};
+					quad = setupQuad();
+					fitCanvas();
+					srcTex = createTextureFromImage(img);
+					texA = createEmptyTexture(canvas.width, canvas.height);
+					texB = createEmptyTexture(canvas.width, canvas.height);
+					fboA = createFBO(texA);
+					fboB = createFBO(texB);
+					return true;
+				}
+
+				function resizeGLTextures(){
+					if(!gl) return;
+					gl.deleteTexture(texA); gl.deleteTexture(texB); gl.deleteFramebuffer(fboA); gl.deleteFramebuffer(fboB);
+					texA = createEmptyTexture(canvas.width, canvas.height);
+					texB = createEmptyTexture(canvas.width, canvas.height);
+					fboA = createFBO(texA); fboB = createFBO(texB);
+				}
+
+				function renderGL(params){
+					if(!gl) return;
+					fitCanvas();
+					gl.viewport(0,0,canvas.width,canvas.height);
+
+					// update source texture if image changed
+					gl.bindTexture(gl.TEXTURE_2D, srcTex);
+					gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+
+					// PASS 1: horizontal blur from srcTex -> texA
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fboA);
+					gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
+					gl.useProgram(programs.blur);
+					gl.bindVertexArray(quad.vao);
+					// attributes
+					const posLoc = gl.getAttribLocation(programs.blur, 'a_pos');
+					const uvLoc = gl.getAttribLocation(programs.blur, 'a_uv');
+					gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc,2,gl.FLOAT,false,16,0);
+					gl.enableVertexAttribArray(uvLoc); gl.vertexAttribPointer(uvLoc,2,gl.FLOAT,false,16,8);
+					// uniforms
+					gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, srcTex);
+					gl.uniform1i(gl.getUniformLocation(programs.blur,'u_tex'), 0);
+					gl.uniform2f(gl.getUniformLocation(programs.blur,'u_texel'), 1.0/canvas.width, 0.0);
+					const radius = Math.max(0.1, (9 - parseFloat(params.aperture || 8)) * 0.6);
+					gl.uniform1f(gl.getUniformLocation(programs.blur,'u_radius'), radius);
+					gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+					// PASS 2: vertical blur from texA -> texB
+					gl.bindFramebuffer(gl.FRAMEBUFFER, fboB);
+					gl.clear(gl.COLOR_BUFFER_BIT);
+					gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texA);
+					gl.uniform1i(gl.getUniformLocation(programs.blur,'u_tex'), 0);
+					gl.uniform2f(gl.getUniformLocation(programs.blur,'u_texel'), 0.0, 1.0/canvas.height);
+					gl.uniform1f(gl.getUniformLocation(programs.blur,'u_radius'), radius);
+					gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+					// PASS 3: final composite from texB -> screen with brightness & noise
+					gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+					gl.useProgram(programs.final);
+					gl.bindVertexArray(quad.vao);
+					gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texB);
+					gl.uniform1i(gl.getUniformLocation(programs.final,'u_tex'), 0);
+					// compute brightness from shutter/iso/exposure
+					const shutterVal = parseFloat(params.shutter) || 125;
+					const exposureAdj = Math.log2(125 / shutterVal);
+					const isoVal = parseFloat(params.iso) || 400;
+					const isoStops = Math.log2(isoVal / 400);
+					const exposureSlider = parseFloat(params.exposure || 0);
+					const totalStops = exposureAdj + isoStops + exposureSlider;
+					const brightness = Math.pow(2, totalStops);
+					gl.uniform1f(gl.getUniformLocation(programs.final,'u_brightness'), brightness);
+					const noiseStrength = Math.max(0, (isoVal - 200) / 1600);
+					gl.uniform1f(gl.getUniformLocation(programs.final,'u_noise'), noiseStrength * 0.06);
+					gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+				}
+
+				function scheduleApply(){ if(raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(()=>{ const vals = getCurrentValues(); if(gl && programs==null){ if(!initGLResources()) { /* fallback handled below */ } } if(gl && programs) { renderGL(vals); } else { // fallback 2D
+						const ctx = fallbackCtx; if(ctx){ // draw simple 2D
+							fitCanvas(); ctx.clearRect(0,0,canvas.width,canvas.height);
+							const iw = img.naturalWidth, ih = img.naturalHeight; const cw = canvas.width, ch = canvas.height; const ir=iw/ih; let dw=cw, dh=ch, dx=0, dy=0; if(ir>cw/ch){ dh=ch; dw=Math.round(ch*ir); dx=Math.round((cw-dw)/2);} else { dw=cw; dh=Math.round(cw/ir); dy=Math.round((ch-dh)/2);} ctx.drawImage(img,dx,dy,dw,dh);
+						}
+					}
+					raf = null; }); }
+
+				function getCurrentValues(){
+					return {
+						aperture: document.getElementById('aperture-slider').value,
+						shutter: document.getElementById('shutter-slider').value,
+						iso: document.getElementById('iso-slider').value,
+						exposure: document.getElementById('exposure-slider').value
+					};
+				}
+
+				function updateLabels(){
+					const ap = document.getElementById('aperture-val'); if(ap) ap.textContent = 'f/' + document.getElementById('aperture-slider').value;
+					const sh = document.getElementById('shutter-val'); if(sh) sh.textContent = '1/' + document.getElementById('shutter-slider').value;
+					const iso = document.getElementById('iso-val'); if(iso) iso.textContent = document.getElementById('iso-slider').value;
+				}
+
+				['aperture-slider','shutter-slider','iso-slider','exposure-slider'].forEach(id=>{
+					const el = document.getElementById(id);
+					if(!el) return;
+					el.addEventListener('input', ()=>{ updateLabels(); scheduleApply(); });
+				});
+
+				window.addEventListener('resize', ()=>{ fitCanvas(); if(gl) resizeGLTextures(); scheduleApply(); });
+
+				if(!gl){ // immediate fallback draw
+					if(fallbackCtx && img.complete){ scheduleApply(); } else if(img){ img.onload = ()=> scheduleApply(); }
+				} else {
+					img.onload = ()=>{ if(programs==null) initGLResources(); scheduleApply(); };
+					if(img.complete){ if(programs==null) initGLResources(); scheduleApply(); }
+				}
+
+				updateLabels(); scheduleApply();
+
+				// Submit opens modal but image updates in real-time already
+				document.getElementById('submitBtn').addEventListener('click', ()=>{
+					const user = getCurrentValues();
+					if(gl && programs) renderGL(user); else scheduleApply();
+					const ev = parseFloat(document.getElementById('exposure-slider').value);
+					const ok = Math.abs(ev) <= 0.6;
+					openResultModal({ok, user, ideal: {iso:200, aperture:8, shutter:125}});
+				});
+
+				// Reset restores defaults and original image
+				document.getElementById('resetBtn').addEventListener('click', ()=>{
+					document.getElementById('iso-slider').value = 600;
+					document.getElementById('aperture-slider').value = 8;
+					document.getElementById('shutter-slider').value = 125;
+					document.getElementById('exposure-slider').value = 0;
+					updateLabels(); if(gl && programs) { renderGL(getCurrentValues()); } else { scheduleApply(); }
+					closeResultModal();
+				});
 			});
 
 			// Exposure slider live update
@@ -510,18 +760,112 @@
 		function closeResultModal(){ modal.setAttribute('aria-hidden','true'); }
 
 		document.addEventListener('DOMContentLoaded', ()=>{
+			// Image render pipeline
+			const img = document.getElementById('source-image');
+			const canvas = document.getElementById('photo-canvas');
+			const ctx = canvas.getContext && canvas.getContext('2d');
+			let originalImageData = null;
+
+			function fitCanvas(){
+				const rect = canvas.parentElement.getBoundingClientRect();
+				canvas.width = Math.round(rect.width);
+				canvas.height = Math.round(rect.height);
+			}
+
+			function drawOriginal(){
+				if(!ctx) return;
+				fitCanvas();
+				ctx.clearRect(0,0,canvas.width,canvas.height);
+				// draw the source image covering the canvas (cover)
+				const iw = img.naturalWidth, ih = img.naturalHeight;
+				const cw = canvas.width, ch = canvas.height;
+				const ir = iw/ih, cr = cw/ch;
+				let dw= cw, dh = ch, dx = 0, dy = 0;
+				if(ir > cr){ // image wider -> fit height
+					dh = ch; dw = ih * ir * (ch/ih); // keep aspect
+					dw = Math.round(ch * ir);
+					dx = Math.round((cw - dw)/2);
+				} else {
+					dw = cw; dh = Math.round(cw / ir);
+					dy = Math.round((ch - dh)/2);
+				}
+				ctx.drawImage(img, dx, dy, dw, dh);
+				try{ originalImageData = ctx.getImageData(0,0,canvas.width,canvas.height); }catch(e){ originalImageData = null; }
+			}
+
+			// very small gaussian blur approximation using canvas filter when available
+			function applyEffects({aperture, shutter, iso}){
+				if(!ctx) return;
+				fitCanvas();
+				// Start from original
+				if(originalImageData){ ctx.putImageData(originalImageData,0,0); }
+				// compute blur from aperture: smaller aperture (higher f-number) = more depth -> less blur.
+				// our aperture slider uses numeric f-values where larger = smaller opening. We'll invert: lower f -> more blur
+				const f = parseFloat(aperture);
+				const blurAmt = Math.max(0, (10 - f) * 1.2); // rough mapping
+
+				// compute exposure change from shutter: faster shutter (higher denominator) -> darker image
+				const shutterVal = parseFloat(shutter); // shutter slider gives denominator like 125
+				const exposureAdj = Math.log2(125 / shutterVal || 1); // relative stops to baseline 125
+
+				// compute ISO effect (noise + slight brightness); baseline 400
+				const isoVal = parseFloat(iso);
+				const isoStops = Math.log2(isoVal / 400 || 1);
+
+				// Use canvas filter when available for blur and brightness
+				const supportsFilter = 'filter' in ctx;
+				if(supportsFilter){
+					ctx.filter = `blur(${blurAmt}px) brightness(${Math.pow(2, exposureAdj + isoStops)})`;
+					// redraw original through filter
+					if(originalImageData){ ctx.putImageData(originalImageData,0,0); } else { drawOriginal(); }
+					ctx.filter = 'none';
+				} else {
+					// fallback: adjust brightness by reading pixels
+					const imgd = ctx.getImageData(0,0,canvas.width,canvas.height);
+					const d = imgd.data;
+					const bright = Math.pow(2, exposureAdj + isoStops);
+					for(let i=0;i<d.length;i+=4){ d[i] = Math.min(255, d[i]*bright); d[i+1] = Math.min(255, d[i+1]*bright); d[i+2] = Math.min(255, d[i+2]*bright); }
+					ctx.putImageData(imgd,0,0);
+				}
+
+				// Add noise for ISO
+				const noiseStrength = Math.max(0, (isoVal - 200) / 1600); // 400 -> small, 800 -> higher
+				if(noiseStrength > 0){
+					const imgd2 = ctx.getImageData(0,0,canvas.width,canvas.height);
+					const d2 = imgd2.data;
+					for(let i=0;i<d2.length;i+=4){
+						const rnd = (Math.random()-0.5) * 255 * noiseStrength * 0.4; // subtle
+						d2[i] = Math.max(0, Math.min(255, d2[i] + rnd));
+						d2[i+1] = Math.max(0, Math.min(255, d2[i+1] + rnd));
+						d2[i+2] = Math.max(0, Math.min(255, d2[i+2] + rnd));
+					}
+					ctx.putImageData(imgd2,0,0);
+				}
+			}
+
+			// initialize image
+			if(img.complete){ drawOriginal(); } else { img.onload = ()=>{ drawOriginal(); }; }
+
+			// wire submit to apply effects and open result modal
 			document.getElementById('submitBtn').addEventListener('click', ()=>{
 				const user = {
 					iso: document.getElementById('iso-slider').value,
 					aperture: document.getElementById('aperture-slider').value,
 					shutter: document.getElementById('shutter-slider').value
 				};
-				// simple evaluation: good if exposure-slider value near 0
+				// apply visual effects
+				applyEffects(user);
+				// simple evaluation logic
 				const ev = parseFloat(document.getElementById('exposure-slider').value);
 				const ok = Math.abs(ev) <= 0.6;
 				openResultModal({ok, user, ideal: {iso:200, aperture:8, shutter:125}});
 			});
-			document.getElementById('resetBtn').addEventListener('click', ()=>{ closeResultModal(); });
+
+			document.getElementById('resetBtn').addEventListener('click', ()=>{
+				// reset canvas
+				drawOriginal();
+				closeResultModal();
+			});
 			document.getElementById('fl-try').addEventListener('click', ()=>{ closeResultModal(); });
 			document.getElementById('fl-next').addEventListener('click', ()=>{ window.location.href = '../practice-levels.html'; });
 		});
@@ -537,7 +881,8 @@
 			<div class="flex-row">
 				<div class="flex-left">
 					<div class="photo-box">
-						<img src="../assets/gun.png" alt="Gun Evidence" />
+						<img id="source-image" src="../assets/gun.png" alt="Gun Evidence" style="display:none" />
+						<canvas id="photo-canvas" aria-label="Photo preview"></canvas>
 					</div>
 					<div class="exposure-label">Exposure Meter: <span>GOOD EXPOSURE</span></div>
 					<div class="exposure-slider">
