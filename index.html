@@ -206,8 +206,34 @@
 			}
 		}
 	</style>
+
+	<!-- Portrait enforcement -->
+	<style>
+		.portrait-blocker { display:none; position:fixed; inset:0; background:#18181a; color:#fff; z-index:9999; align-items:center; justify-content:center; text-align:center; padding:20px; }
+		.portrait-blocker.show { display:flex; }
+		.portrait-blocker h2 { font-size:1.4rem; margin-bottom:8px; }
+		.portrait-blocker p { color:#b3b3b7; font-size:1rem; }
+	</style>
+	<script>
+		function updatePortraitBlock() {
+			const pb = document.getElementById('portrait-block');
+			if(!pb) return;
+			// prefer orientation API if available
+			const isPortrait = window.matchMedia && window.matchMedia('(orientation: portrait)').matches;
+			if(isPortrait) pb.classList.remove('show'); else pb.classList.add('show');
+		}
+		window.addEventListener('resize', updatePortraitBlock);
+		window.addEventListener('orientationchange', updatePortraitBlock);
+		document.addEventListener('DOMContentLoaded', updatePortraitBlock);
+	</script>
 </head>
 <body>
+	<div id="portrait-block" class="portrait-blocker" role="dialog" aria-live="polite">
+		<div>
+			<h2>Please rotate your device</h2>
+			<p>This app works best in portrait orientation. Rotate your device to continue.</p>
+		</div>
+	</div>
 	<div class="container">
 		<div class="title">FORENSIC LENS</div>
 		<div class="subtitle">Master forensic photography through<br>interactive training and practice.</div>

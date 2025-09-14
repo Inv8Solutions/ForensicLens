@@ -182,8 +182,32 @@
       }
     }
   </style>
+  <!-- Portrait enforcement -->
+  <style>
+    .portrait-blocker { display:none; position:fixed; inset:0; background:#18181a; color:#fff; z-index:9999; align-items:center; justify-content:center; text-align:center; padding:20px; }
+    .portrait-blocker.show { display:flex; }
+    .portrait-blocker h2 { font-size:1.4rem; margin-bottom:8px; }
+    .portrait-blocker p { color:#b3b3b7; font-size:1rem; }
+  </style>
+  <script>
+    function updatePortraitBlockPL() {
+      const pb = document.getElementById('portrait-block-pl');
+      if(!pb) return;
+      const isPortrait = window.matchMedia && window.matchMedia('(orientation: portrait)').matches;
+      if(isPortrait) pb.classList.remove('show'); else pb.classList.add('show');
+    }
+    window.addEventListener('resize', updatePortraitBlockPL);
+    window.addEventListener('orientationchange', updatePortraitBlockPL);
+    document.addEventListener('DOMContentLoaded', updatePortraitBlockPL);
+  </script>
 </head>
 <body>
+  <div id="portrait-block-pl" class="portrait-blocker" role="dialog" aria-live="polite">
+    <div>
+      <h2>Please rotate your device</h2>
+      <p>This screen requires portrait orientation. Rotate to continue.</p>
+    </div>
+  </div>
   <button class="back-btn" onclick="window.history.back()" aria-label="Back">
     <svg viewBox="0 0 32 32"><path d="M20.7 25.3a1 1 0 0 1-1.4 0l-8-8a1 1 0 0 1 0-1.4l8-8a1 1 0 1 1 1.4 1.4L13.42 16l7.3 7.3a1 1 0 0 1 0 1.4z"/></svg>
   </button>
@@ -198,9 +222,9 @@
         <div class="level-title">Gun Evidence</div>
         <div class="level-desc">Capture firearm details in controlled lighting</div>
         <div class="level-action">
-          <button class="go-btn" aria-label="Start Level 1">
+          <a href="./levels/level1.html" class="go-btn" aria-label="Start Level 1">
             <span style="font-size:1.5rem;">&#8594;</span>
-          </button>
+          </a>
         </div>
       </div>
       <div class="level-card">
