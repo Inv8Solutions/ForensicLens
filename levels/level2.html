@@ -372,6 +372,18 @@
 			.btn.submit { background: #e22e32; color: #fff; border: 1px solid #555; }
 			.btn:active { transform: translateY(1px); }
 		</style>
+
+			<style>
+				/* Flash toggle visual styles */
+				.flash-toggle { display:flex; align-items:center; gap:8px; justify-content:flex-start; padding:10px 12px; border-radius:12px; background:#171718; border:1px solid #2b2b2b; color:#ddd; font-weight:700; cursor:pointer; width:100%; transition: background 160ms, color 160ms, box-shadow 160ms; }
+				.flash-toggle .indicator { width:14px; height:14px; border-radius:50%; background:#4a4a4a; box-shadow:inset 0 -2px 4px rgba(0,0,0,0.5); border:1px solid #2f2f2f; transition: background 160ms, transform 160ms; }
+				.flash-toggle .label { margin-left:6px; font-size:0.95rem; color:inherit; }
+				/* ON = green (enabled), OFF = red (disabled) */
+				.flash-toggle.on { background: linear-gradient(90deg,#6fe27a,#2fc24a); color:#082308; box-shadow:0 6px 18px rgba(47,194,74,0.12); }
+				.flash-toggle.on .indicator { background: #063a08; transform: scale(1.05); box-shadow:0 2px 8px rgba(0,0,0,0.12); border-color: #0b5a0d; }
+				.flash-toggle.off { background: linear-gradient(90deg,#ff9b9b,#ff4f4f); color:#330606; box-shadow:0 6px 18px rgba(255,79,79,0.10); }
+				.flash-toggle.off .indicator { background: #330606; border-color: #5a0b0b; }
+			</style>
 	<script>
 			// Simple toast for submit feedback
 			function showToast(msg) {
@@ -595,14 +607,17 @@
 					gl.bindVertexArray(quad.vao);
 					gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texB);
 					gl.uniform1i(gl.getUniformLocation(programs.final,'u_tex'), 0);
-					// compute brightness from shutter/iso/exposure
+					// compute brightness from shutter/iso/exposure (and flash)
 					const shutterVal = parseFloat(params.shutter) || 125;
 					const exposureAdj = Math.log2(125 / shutterVal);
 					const isoVal = parseFloat(params.iso) || 400;
 					const isoStops = Math.log2(isoVal / 400);
 					const exposureSlider = parseFloat(params.exposure || 0);
 					const totalStops = exposureAdj + isoStops + exposureSlider;
-					const brightness = Math.pow(2, totalStops);
+					let brightness = Math.pow(2, totalStops);
+					if(params.flash){ // flash adds roughly +2 stops (bright quick burst)
+						brightness *= 4.0;
+					}
 					gl.uniform1f(gl.getUniformLocation(programs.final,'u_brightness'), brightness);
 					const noiseStrength = Math.max(0, (isoVal - 200) / 1600);
 					gl.uniform1f(gl.getUniformLocation(programs.final,'u_noise'), noiseStrength * 0.06);
@@ -622,7 +637,8 @@
 						aperture: document.getElementById('aperture-slider').value,
 						shutter: document.getElementById('shutter-slider').value,
 						iso: document.getElementById('iso-slider').value,
-						exposure: document.getElementById('exposure-slider').value
+						exposure: document.getElementById('exposure-slider').value,
+						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on')
 					};
 				}
 
@@ -665,8 +681,24 @@
 					document.getElementById('shutter-slider').value = 125;
 					document.getElementById('exposure-slider').value = 0;
 					updateLabels(); if(gl && programs) { renderGL(getCurrentValues()); } else { scheduleApply(); }
+					// reset flash visual state
+					const fbtnR = document.getElementById('flashToggle'); if(fbtnR){ fbtnR.classList.remove('on'); fbtnR.classList.add('off'); fbtnR.setAttribute('aria-checked','false'); const s = fbtnR.querySelector('span'); if(s) s.textContent = 'Off'; }
 					closeResultModal();
 				});
+
+				// Flash toggle wiring (GL pipeline)
+				const flashBtn = document.getElementById('flashToggle');
+				if(flashBtn){
+					// ensure initial visual state
+					if(!flashBtn.classList.contains('on')){ flashBtn.classList.add('off'); flashBtn.setAttribute('aria-checked','false'); const s0 = flashBtn.querySelector('span'); if(s0) s0.textContent = 'Off'; }
+					flashBtn.addEventListener('click', ()=>{
+						const isOn = flashBtn.classList.toggle('on');
+						flashBtn.classList.toggle('off', !isOn);
+						flashBtn.setAttribute('aria-checked', isOn ? 'true' : 'false');
+						const s = flashBtn.querySelector('span'); if(s) s.textContent = isOn ? 'On' : 'Off';
+						scheduleApply();
+					});
+				}
 			});
 
 			// Exposure slider live update
@@ -723,6 +755,23 @@
 					</div>
 				</div>
 			</div>
+
+				<!-- Global helper to ensure flash toggle reliably updates UI and triggers rendering -->
+				<script>
+					function toggleFlashUI(e){
+						const btn = document.getElementById('flashToggle');
+						if(!btn) return;
+						const isOn = btn.classList.toggle('on');
+						btn.classList.toggle('off', !isOn);
+						btn.setAttribute('aria-checked', isOn ? 'true' : 'false');
+						const lbl = btn.querySelector('span'); if(lbl) lbl.textContent = isOn ? 'On' : 'Off';
+						// also update indicator styling immediately
+						const ind = btn.querySelector('.indicator'); if(ind){ /* visual handled by CSS classes */ }
+						// trigger existing input handlers by dispatching an input event on a slider
+						const ex = document.getElementById('exposure-slider');
+						if(ex){ const ev = new Event('input', { bubbles:true, cancelable:true }); ex.dispatchEvent(ev); }
+					}
+				</script>
 
 			<div class="fl-actions">
 				<button id="fl-try" class="fl-btn fl-ghost">Try Again</button>
@@ -794,7 +843,7 @@
 			}
 
 			// very small gaussian blur approximation using canvas filter when available
-			function applyEffects({aperture, shutter, iso}){
+				function applyEffects({aperture, shutter, iso, flash}){
 				if(!ctx) return;
 				fitCanvas();
 				// Start from original
@@ -844,28 +893,42 @@
 			}
 
 			// initialize image
-			if(img.complete){ drawOriginal(); } else { img.onload = ()=>{ drawOriginal(); }; }
+				if(img.complete){ drawOriginal(); } else { img.onload = ()=>{ drawOriginal(); }; }
 
-			// wire submit to apply effects and open result modal
-			document.getElementById('submitBtn').addEventListener('click', ()=>{
-				const user = {
-					iso: document.getElementById('iso-slider').value,
-					aperture: document.getElementById('aperture-slider').value,
-					shutter: document.getElementById('shutter-slider').value
-				};
-				// apply visual effects
-				applyEffects(user);
-				// simple evaluation logic
-				const ev = parseFloat(document.getElementById('exposure-slider').value);
-				const ok = Math.abs(ev) <= 0.6;
-				openResultModal({ok, user, ideal: {iso:200, aperture:8, shutter:125}});
-			});
+				// wire submit to apply effects and open result modal (2D fallback)
+				document.getElementById('submitBtn').addEventListener('click', ()=>{
+					const user = {
+						iso: document.getElementById('iso-slider').value,
+						aperture: document.getElementById('aperture-slider').value,
+						shutter: document.getElementById('shutter-slider').value,
+						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on')
+					};
+					applyEffects(user);
+					const ev2 = parseFloat(document.getElementById('exposure-slider').value);
+					const ok2 = Math.abs(ev2) <= 0.6;
+					openResultModal({ok: ok2, user, ideal: {iso:200, aperture:8, shutter:125}});
+				});
 
-			document.getElementById('resetBtn').addEventListener('click', ()=>{
-				// reset canvas
-				drawOriginal();
-				closeResultModal();
-			});
+				// reset handler for 2D fallback
+				document.getElementById('resetBtn').addEventListener('click', ()=>{
+					drawOriginal();
+					const fbtn = document.getElementById('flashToggle'); if(fbtn){ fbtn.classList.remove('on'); fbtn.classList.add('off'); fbtn.setAttribute('aria-checked','false'); const s = fbtn.querySelector('span'); if(s) s.textContent = 'Off'; }
+					closeResultModal();
+				});
+
+				// Flash toggle wiring for 2D fallback
+				const flashBtn2 = document.getElementById('flashToggle');
+				if(flashBtn2){
+					if(!flashBtn2.classList.contains('on')){ flashBtn2.classList.add('off'); flashBtn2.setAttribute('aria-checked','false'); const s0 = flashBtn2.querySelector('span'); if(s0) s0.textContent = 'Off'; }
+					flashBtn2.addEventListener('click', ()=>{
+						const isOn = flashBtn2.classList.toggle('on');
+						flashBtn2.classList.toggle('off', !isOn);
+						flashBtn2.setAttribute('aria-checked', isOn ? 'true' : 'false');
+						const s = flashBtn2.querySelector('span'); if(s) s.textContent = isOn ? 'On' : 'Off';
+						// reapply effects to reflect flash immediately
+						applyEffects({aperture: document.getElementById('aperture-slider').value, shutter: document.getElementById('shutter-slider').value, iso: document.getElementById('iso-slider').value, flash: isOn});
+					});
+				}
 			document.getElementById('fl-try').addEventListener('click', ()=>{ closeResultModal(); });
 			document.getElementById('fl-next').addEventListener('click', ()=>{ window.location.href = '../practice-levels.html'; });
 		});
@@ -881,7 +944,7 @@
 			<div class="flex-row">
 				<div class="flex-left">
 					<div class="photo-box">
-						<img id="source-image" src="../assets/vehicle.png" alt="Gun Evidence" style="display:none" />
+						<img id="source-image" src="../assets/vehicle.png" alt="Vehicle Evidence" style="display:none" />
 						<canvas id="photo-canvas" aria-label="Photo preview"></canvas>
 					</div>
 					<div class="exposure-label">Exposure Meter: <span>GOOD EXPOSURE</span></div>
@@ -901,7 +964,17 @@
 					</div>
 				</div>
 				<div class="flex-right">
-					<div class="controls-title" >Camera Controls</div>
+					<!-- Header: title on the left, flash toggle on the right -->
+					<div class="controls-title" style="display:flex; justify-content:space-between; align-items:center;">
+						<span>Camera Controls</span>
+						<div style="display:flex; align-items:center; gap:8px;">
+							<div class="control-label" style="margin:0; font-size:12px;">Flash</div>
+							<button id="flashToggle" class="flash-toggle" role="switch" aria-checked="false" onclick="toggleFlashUI(event)">
+								<div class="indicator" aria-hidden="true"></div>
+								<span style="margin-left:6px;">Off</span>
+							</button>
+						</div>
+					</div>
 					<div class="controls-inner">
 						<div class="control-group" >
 							<div class="control-label">&#9673; APERTURE: <span id="aperture-val">10</span></div>
