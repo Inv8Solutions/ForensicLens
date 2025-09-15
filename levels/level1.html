@@ -964,7 +964,17 @@
 					</div>
 				</div>
 				<div class="flex-right">
-					<div class="controls-title" >Camera Controls</div>
+					<!-- Header: title on the left, flash toggle on the right -->
+					<div class="controls-title" style="display:flex; justify-content:space-between; align-items:center;">
+						<span>Camera Controls</span>
+						<div style="display:flex; align-items:center; gap:8px;">
+							<div class="control-label" style="margin:0; font-size:12px;">Flash</div>
+							<button id="flashToggle" class="flash-toggle" role="switch" aria-checked="false" onclick="toggleFlashUI(event)">
+								<div class="indicator" aria-hidden="true"></div>
+								<span style="margin-left:6px;">Off</span>
+							</button>
+						</div>
+					</div>
 					<div class="controls-inner">
 						<div class="control-group" >
 							<div class="control-label">&#9673; APERTURE: <span id="aperture-val">10</span></div>
@@ -1003,13 +1013,6 @@
 							<button class="btn submit" id="submitBtn">Submit</button>
 						</div>
 					</div>
-				</div>
-				<div class="control-group">
-					<div class="control-label">Flash</div>
-					<button id="flashToggle" class="flash-toggle" role="switch" aria-checked="false" onclick="toggleFlashUI(event)">
-						<div class="indicator" aria-hidden="true"></div>
-						<span style="margin-left:6px;">Off</span>
-					</button>
 				</div>
 			</div>
         </div>
