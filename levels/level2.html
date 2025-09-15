@@ -668,13 +668,43 @@
 
 				updateLabels(); scheduleApply();
 
-				// Submit opens modal but image updates in real-time already
+				// Ideal forensic settings for photographing a vehicle at night (Level 2)
+				// Assumption: given Level 2 ranges (ISO 400-1600, f/4-f/8, shutter 1/10-1/30)
+				// a practical compromise for evidence capture (handheld or limited support)
+				// is to use a mid ISO with a moderate aperture and mid shutter to reduce
+				// motion blur while keeping noise reasonable. This is a conservative
+				// recommended baseline for training purposes.
+				const IDEAL_VEHICLE_NIGHT = { iso: 800, aperture: 8, shutter: 20 };
+
+				function stopsForSettingsLevel2({iso, aperture, shutter, exposure}){
+					const shutterVal = parseFloat(shutter) || 20; // denominator (1/x)
+					const shutterStops = Math.log2(125 / shutterVal);
+					const isoVal = parseFloat(iso) || 800;
+					const isoStops = Math.log2(isoVal / 400); // Level 2 baseline use 400 for stops mapping
+					const f = parseFloat(aperture) || 8;
+					const apStops = 2.0 * Math.log2(8.0 / f); // baseline f/8 mapping used elsewhere
+					const exposureSlider = parseFloat(exposure || 0);
+					return { totalStops: shutterStops + isoStops + apStops + exposureSlider, shutterStops, isoStops, apStops };
+				}
+
+				function evaluateUserLevel2(user){
+					const u = stopsForSettingsLevel2(user);
+					const ideal = stopsForSettingsLevel2({ iso: IDEAL_VEHICLE_NIGHT.iso, aperture: IDEAL_VEHICLE_NIGHT.aperture, shutter: IDEAL_VEHICLE_NIGHT.shutter, exposure:0 });
+					const delta = u.totalStops - ideal.totalStops;
+					return { delta, userStops: u, idealStops: ideal, withinTolerance: Math.abs(delta) <= 0.7 };
+				}
+
+				// Submit opens modal and evaluates by stops (Level 2)
 				document.getElementById('submitBtn').addEventListener('click', ()=>{
 					const user = getCurrentValues();
 					if(gl && programs) renderGL(user); else scheduleApply();
-					const ev = parseFloat(document.getElementById('exposure-slider').value);
-					const ok = Math.abs(ev) <= 0.6;
-					openResultModal({ok, user, ideal: {iso:200, aperture:8, shutter:125}});
+					const result = evaluateUserLevel2(user);
+					openResultModal({ ok: result.withinTolerance, user, ideal: IDEAL_VEHICLE_NIGHT });
+					if(!result.withinTolerance){
+						const diff = result.delta;
+						const msg = diff > 0 ? 'Image likely overexposed by ~' + diff.toFixed(2) + ' stops.' : 'Image likely underexposed by ~' + Math.abs(diff).toFixed(2) + ' stops.';
+						flMessage.textContent = msg + ' Adjust ISO/aperture/shutter.';
+					}
 				});
 
 				// Reset restores defaults and original image (Level 2 defaults)
@@ -752,9 +782,9 @@
 				<div class="fl-col">
 					<div class="fl-col-title">Ideal Settings</div>
 					<div class="fl-list">
-						<p id="fl-iso-ideal">ISO: 200</p>
-						<p id="fl-ap-ideal">F/8</p>
-						<p id="fl-sh-ideal">1/125s</p>
+						<p id="fl-iso-ideal">ISO: 800</p>
+						<p id="fl-ap-ideal">F/5.6</p>
+						<p id="fl-sh-ideal">1/20s</p>
 					</div>
 				</div>
 			</div>
@@ -807,7 +837,14 @@
 			flIsoUser.textContent = 'ISO: ' + user.iso;
 			flApUser.textContent = 'Aperture: f/' + user.aperture;
 			flShUser.textContent = 'Shutter: 1/' + user.shutter + 's';
-			// TODO: populate ideal values if provided
+			if(ideal){
+				const flIsoIdeal = document.getElementById('fl-iso-ideal');
+				const flApIdeal = document.getElementById('fl-ap-ideal');
+				const flShIdeal = document.getElementById('fl-sh-ideal');
+				if(flIsoIdeal) flIsoIdeal.textContent = 'ISO: ' + (ideal.iso || '200');
+				if(flApIdeal) flApIdeal.textContent = 'Aperture: f/' + (ideal.aperture || '8');
+				if(flShIdeal) flShIdeal.textContent = 'Shutter: 1/' + (ideal.shutter || '125') + 's';
+			}
 		}
 		function closeResultModal(){ modal.setAttribute('aria-hidden','true'); }
 
@@ -913,50 +950,21 @@
 			// initialize image
 				if(img.complete){ drawOriginal(); } else { img.onload = ()=>{ drawOriginal(); }; }
 
-				// wire submit to apply effects and open result modal (2D fallback)
-				document.getElementById('submitBtn').addEventListener('click', ()=>{
-					const user = {
-						iso: document.getElementById('iso-slider').value,
-						aperture: document.getElementById('aperture-slider').value,
-						shutter: document.getElementById('shutter-slider').value,
-						exposure: document.getElementById('exposure-slider').value,
-						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on'),
-						oblique: document.getElementById('obliqueBtn') && document.getElementById('obliqueBtn').getAttribute('data-oblique')
-					};
-					applyEffects(user);
-					const ev2 = parseFloat(document.getElementById('exposure-slider').value);
-					const ok2 = Math.abs(ev2) <= 0.6;
-					openResultModal({ok: ok2, user, ideal: {iso:200, aperture:8, shutter:125}});
-				});
-
-				// reset handler for 2D fallback
-				document.getElementById('resetBtn').addEventListener('click', ()=>{
-					// Level2 defaults
-					document.getElementById('iso-slider').value = 400;
-					document.getElementById('aperture-slider').value = 5.6;
-					document.getElementById('shutter-slider').value = 30;
-					document.getElementById('exposure-slider').value = 0;
-					drawOriginal();
-					const fbtn = document.getElementById('flashToggle'); if(fbtn){ fbtn.classList.remove('on'); fbtn.classList.add('off'); fbtn.setAttribute('aria-checked','false'); const s = fbtn.querySelector('span'); if(s) s.textContent = 'Off'; }
-					updateLabels(); if(gl && programs) { renderGL(getCurrentValues()); } else { applyEffects({aperture: document.getElementById('aperture-slider').value, shutter: document.getElementById('shutter-slider').value, iso: document.getElementById('iso-slider').value, exposure: document.getElementById('exposure-slider').value, flash: false, oblique: document.getElementById('obliqueBtn') && document.getElementById('obliqueBtn').getAttribute('data-oblique')}); }
-					closeResultModal();
-				});
-
-				// Flash toggle wiring for 2D fallback
-				const flashBtn2 = document.getElementById('flashToggle');
-				if(flashBtn2){
-					if(!flashBtn2.classList.contains('on')){ flashBtn2.classList.add('off'); flashBtn2.setAttribute('aria-checked','false'); const s0 = flashBtn2.querySelector('span'); if(s0) s0.textContent = 'Off'; }
-					flashBtn2.addEventListener('click', ()=>{
-						const isOn = flashBtn2.classList.toggle('on');
-						flashBtn2.classList.toggle('off', !isOn);
-						flashBtn2.setAttribute('aria-checked', isOn ? 'true' : 'false');
-						const s = flashBtn2.querySelector('span'); if(s) s.textContent = isOn ? 'On' : 'Off';
-						// reapply effects to reflect flash immediately
-						applyEffects({aperture: document.getElementById('aperture-slider').value, shutter: document.getElementById('shutter-slider').value, iso: document.getElementById('iso-slider').value, flash: isOn, exposure: document.getElementById('exposure-slider').value, oblique: document.getElementById('obliqueBtn') && document.getElementById('obliqueBtn').getAttribute('data-oblique')});
+				// The 2D-fallback rendering uses applyEffects/drawOriginal above, but
+				// avoid attaching duplicate submit/reset/flash handlers here. The
+				// primary submit/reset/flash wiring (earlier) handles evaluation and
+				// modal control. Duplicate listeners would overwrite correct
+				// behavior and produce false positives.
+				if(typeof drawOriginal === 'function' && document.getElementById('resetBtn')){
+					// minimal fallback reset: restore defaults visually and draw original
+					document.getElementById('resetBtn').addEventListener('click', ()=>{
+						document.getElementById('iso-slider').value = 400;
+						document.getElementById('aperture-slider').value = 5.6;
+						document.getElementById('shutter-slider').value = 30;
+						document.getElementById('exposure-slider').value = 0;
+						updateLabels(); drawOriginal(); closeResultModal();
 					});
 				}
-			document.getElementById('fl-try').addEventListener('click', ()=>{ closeResultModal(); });
-			document.getElementById('fl-next').addEventListener('click', ()=>{ window.location.href = '../practice-levels.html'; });
 		});
 	</script>
 	<div class="top-bar">
