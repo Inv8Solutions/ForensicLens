@@ -669,13 +669,44 @@
 
 				updateLabels(); scheduleApply();
 
-				// Submit opens modal but image updates in real-time already
+
+				// Level 3 ideal (for close/microscopic evidence with long exposure)
+				// Level 3 ranges were set to ISO 200-400, aperture f/12-f/16, shutter 1s
+				// We'll use a conservative forensic baseline for this level:
+				const IDEAL_LEVEL3 = { iso: 200, aperture: 13, shutter: 1 };
+
+				function stopsForSettingsLevel3({iso, aperture, shutter, exposure}){
+					// shutter is seconds (1s), map to denominator baseline 1/125 for stops math
+					const shutterVal = parseFloat(shutter) || 1; // seconds
+					// convert seconds to denominator for stops comparison: denom = 1 / shutterVal
+					const denom = shutterVal > 0 ? (1.0 / shutterVal) : 125.0;
+					const shutterStops = Math.log2(125 / denom);
+					const isoVal = parseFloat(iso) || 200;
+					const isoStops = Math.log2(isoVal / 200);
+					const f = parseFloat(aperture) || 13;
+					const apStops = 2.0 * Math.log2(8.0 / f);
+					const exposureSlider = parseFloat(exposure || 0);
+					return { totalStops: shutterStops + isoStops + apStops + exposureSlider, shutterStops, isoStops, apStops };
+				}
+
+				function evaluateUserLevel3(user){
+					const u = stopsForSettingsLevel3(user);
+					const ideal = stopsForSettingsLevel3({ iso: IDEAL_LEVEL3.iso, aperture: IDEAL_LEVEL3.aperture, shutter: IDEAL_LEVEL3.shutter, exposure:0 });
+					const delta = u.totalStops - ideal.totalStops;
+					return { delta, userStops: u, idealStops: ideal, withinTolerance: Math.abs(delta) <= 0.25 };
+				}
+
+				// Submit uses stops-based evaluation for Level 3
 				document.getElementById('submitBtn').addEventListener('click', ()=>{
 					const user = getCurrentValues();
 					if(gl && programs) renderGL(user); else scheduleApply();
-					const ev = parseFloat(document.getElementById('exposure-slider').value);
-					const ok = Math.abs(ev) <= 0.6;
-					openResultModal({ok, user, ideal: {iso:200, aperture:16, shutter:1}});
+					const result = evaluateUserLevel3(user);
+					openResultModal({ ok: result.withinTolerance, user, ideal: IDEAL_LEVEL3 });
+					if(!result.withinTolerance){
+						const diff = result.delta;
+						const msg = diff > 0 ? 'Image likely overexposed by ~' + diff.toFixed(2) + ' stops.' : 'Image likely underexposed by ~' + Math.abs(diff).toFixed(2) + ' stops.';
+						flMessage.textContent = msg + ' Adjust ISO/aperture/shutter.';
+					}
 				});
 
 				// Reset restores defaults and original image
@@ -808,7 +839,14 @@
 			flIsoUser.textContent = 'ISO: ' + user.iso;
 			flApUser.textContent = 'Aperture: f/' + user.aperture;
 			flShUser.textContent = 'Shutter: 1/' + user.shutter + 's';
-			// TODO: populate ideal values if provided
+			if(ideal){
+				const flIsoIdeal = document.getElementById('fl-iso-ideal');
+				const flApIdeal = document.getElementById('fl-ap-ideal');
+				const flShIdeal = document.getElementById('fl-sh-ideal');
+				if(flIsoIdeal) flIsoIdeal.textContent = 'ISO: ' + (ideal.iso || '200');
+				if(flApIdeal) flApIdeal.textContent = 'Aperture: f/' + (ideal.aperture || '16');
+				if(flShIdeal) flShIdeal.textContent = 'Shutter: ' + (ideal.shutter ? (ideal.shutter + 's') : '1s');
+			}
 		}
 		function closeResultModal(){ modal.setAttribute('aria-hidden','true'); }
 
@@ -913,48 +951,19 @@
 			// initialize image
 				if(img.complete){ drawOriginal(); } else { img.onload = ()=>{ drawOriginal(); }; }
 
-				// wire submit to apply effects and open result modal (2D fallback)
-				document.getElementById('submitBtn').addEventListener('click', ()=>{
-					const user = {
-						iso: document.getElementById('iso-slider').value,
-						aperture: document.getElementById('aperture-slider').value,
-						shutter: document.getElementById('shutter-slider').value,
-						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on')
-					};
-					applyEffects(user);
-					const ev2 = parseFloat(document.getElementById('exposure-slider').value);
-					const ok2 = Math.abs(ev2) <= 0.6;
-					openResultModal({ok: ok2, user, ideal: {iso:200, aperture:8, shutter:125}});
-				});
-
-				// reset handler for 2D fallback
-				document.getElementById('resetBtn').addEventListener('click', ()=>{
-					// Level3 defaults
-					document.getElementById('iso-slider').value = 200;
-					document.getElementById('aperture-slider').value = 14;
-					document.getElementById('shutter-slider').value = 1;
-					document.getElementById('exposure-slider').value = 0;
-					drawOriginal();
-					const fbtn = document.getElementById('flashToggle'); if(fbtn){ fbtn.classList.remove('on'); fbtn.classList.add('off'); fbtn.setAttribute('aria-checked','false'); const s = fbtn.querySelector('span'); if(s) s.textContent = 'Off'; }
-					updateLabels(); if(gl && programs) { renderGL(getCurrentValues()); } else { applyEffects(getCurrentValues()); }
-					closeResultModal();
-				});
-
-				// Flash toggle wiring for 2D fallback
-				const flashBtn2 = document.getElementById('flashToggle');
-				if(flashBtn2){
-					if(!flashBtn2.classList.contains('on')){ flashBtn2.classList.add('off'); flashBtn2.setAttribute('aria-checked','false'); const s0 = flashBtn2.querySelector('span'); if(s0) s0.textContent = 'Off'; }
-					flashBtn2.addEventListener('click', ()=>{
-						const isOn = flashBtn2.classList.toggle('on');
-						flashBtn2.classList.toggle('off', !isOn);
-						flashBtn2.setAttribute('aria-checked', isOn ? 'true' : 'false');
-						const s = flashBtn2.querySelector('span'); if(s) s.textContent = isOn ? 'On' : 'Off';
-						// reapply effects to reflect flash immediately
-						applyEffects({aperture: document.getElementById('aperture-slider').value, shutter: document.getElementById('shutter-slider').value, iso: document.getElementById('iso-slider').value, flash: isOn, exposure: document.getElementById('exposure-slider').value, oblique: document.getElementById('obliqueBtn') && document.getElementById('obliqueBtn').getAttribute('data-oblique')});
+				// For the 2D fallback, avoid duplicating submit/reset/flash logic. The
+				// primary submit/reset wiring above handles evaluation and modal state.
+				if(typeof drawOriginal === 'function' && document.getElementById('resetBtn')){
+					document.getElementById('resetBtn').addEventListener('click', ()=>{
+						document.getElementById('iso-slider').value = 200;
+						document.getElementById('aperture-slider').value = 14;
+						document.getElementById('shutter-slider').value = 1;
+						document.getElementById('exposure-slider').value = 0;
+						updateLabels(); drawOriginal(); closeResultModal();
 					});
 				}
-			document.getElementById('fl-try').addEventListener('click', ()=>{ closeResultModal(); });
-			document.getElementById('fl-next').addEventListener('click', ()=>{ window.location.href = '../practice-levels.html'; });
+				document.getElementById('fl-try').addEventListener('click', ()=>{ closeResultModal(); });
+				document.getElementById('fl-next').addEventListener('click', ()=>{ window.location.href = '../practice-levels.html'; });
 		});
 	</script>
 	<div class="top-bar">
