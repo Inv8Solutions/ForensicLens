@@ -588,7 +588,10 @@
 					gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, srcTex);
 					gl.uniform1i(gl.getUniformLocation(programs.blur,'u_tex'), 0);
 					gl.uniform2f(gl.getUniformLocation(programs.blur,'u_texel'), 1.0/canvas.width, 0.0);
-					const radius = Math.max(0.1, (9 - parseFloat(params.aperture || 8)) * 0.6);
+					// compute blur radius from aperture (approximate DOF): smaller f-number => more blur
+					const f = parseFloat(params.aperture || 8.0);
+					// map aperture to blur radius: ratio relative to baseline f=8.0
+					const radius = Math.max(0.1, Math.max(0.0, (8.0 / f - 1.0)) * 6.0);
 					gl.uniform1f(gl.getUniformLocation(programs.blur,'u_radius'), radius);
 					gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
@@ -607,13 +610,16 @@
 					gl.bindVertexArray(quad.vao);
 					gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texB);
 					gl.uniform1i(gl.getUniformLocation(programs.final,'u_tex'), 0);
-					// compute brightness from shutter/iso/exposure (and flash)
+					// compute brightness from shutter/iso/aperture/exposure (stops relative to baselines)
 					const shutterVal = parseFloat(params.shutter) || 125;
 					const exposureAdj = Math.log2(125 / shutterVal);
 					const isoVal = parseFloat(params.iso) || 400;
 					const isoStops = Math.log2(isoVal / 400);
+					const fAperture = parseFloat(params.aperture) || 8.0;
+					// aperture exposure: proportional to 1/(f^2) => stops = 2 * log2(baseline_f / f)
+					const apertureStops = 2.0 * Math.log2(8.0 / fAperture);
 					const exposureSlider = parseFloat(params.exposure || 0);
-					const totalStops = exposureAdj + isoStops + exposureSlider;
+					const totalStops = exposureAdj + isoStops + apertureStops + exposureSlider;
 					let brightness = Math.pow(2, totalStops);
 					if(params.flash){ // flash adds roughly +2 stops (bright quick burst)
 						brightness *= 4.0;
@@ -633,12 +639,15 @@
 					raf = null; }); }
 
 				function getCurrentValues(){
+					const obBtn = document.getElementById('obliqueBtn');
+					const ob = obBtn && obBtn.getAttribute('data-oblique') ? obBtn.getAttribute('data-oblique') : null;
 					return {
 						aperture: document.getElementById('aperture-slider').value,
 						shutter: document.getElementById('shutter-slider').value,
 						iso: document.getElementById('iso-slider').value,
 						exposure: document.getElementById('exposure-slider').value,
-						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on')
+						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on'),
+						oblique: ob
 					};
 				}
 
@@ -676,7 +685,7 @@
 
 				// Reset restores defaults and original image
 				document.getElementById('resetBtn').addEventListener('click', ()=>{
-					document.getElementById('iso-slider').value = 600;
+					document.getElementById('iso-slider').value = 400;
 					document.getElementById('aperture-slider').value = 8;
 					document.getElementById('shutter-slider').value = 125;
 					document.getElementById('exposure-slider').value = 0;
@@ -843,28 +852,28 @@
 			}
 
 			// very small gaussian blur approximation using canvas filter when available
-				function applyEffects({aperture, shutter, iso, flash}){
+				function applyEffects({aperture, shutter, iso, flash, exposure, oblique}){
 				if(!ctx) return;
 				fitCanvas();
 				// Start from original
 				if(originalImageData){ ctx.putImageData(originalImageData,0,0); }
-				// compute blur from aperture: smaller aperture (higher f-number) = more depth -> less blur.
-				// our aperture slider uses numeric f-values where larger = smaller opening. We'll invert: lower f -> more blur
-				const f = parseFloat(aperture);
-				const blurAmt = Math.max(0, (10 - f) * 1.2); // rough mapping
+				// compute blur from aperture: smaller f-number = more blur (approx DOF)
+				const f = parseFloat(aperture || 8.0);
+				const blurAmt = Math.max(0, Math.max(0, (8.0 / f - 1.0)) * 6.0);
 
-				// compute exposure change from shutter: faster shutter (higher denominator) -> darker image
-				const shutterVal = parseFloat(shutter); // shutter slider gives denominator like 125
-				const exposureAdj = Math.log2(125 / shutterVal || 1); // relative stops to baseline 125
-
-				// compute ISO effect (noise + slight brightness); baseline 400
-				const isoVal = parseFloat(iso);
+				// compute exposure change from shutter and aperture: baseline shutter 125, aperture f/8
+				const shutterVal = parseFloat(shutter) || 125;
+				const exposureAdj = Math.log2(125 / shutterVal);
+				const isoVal = parseFloat(iso) || 400;
 				const isoStops = Math.log2(isoVal / 400 || 1);
+				const apertureStops = 2.0 * Math.log2(8.0 / f);
+				const exposureSlider = parseFloat(exposure || 0);
+				const totalStops = exposureAdj + isoStops + apertureStops + exposureSlider;
 
 				// Use canvas filter when available for blur and brightness
 				const supportsFilter = 'filter' in ctx;
 				if(supportsFilter){
-					ctx.filter = `blur(${blurAmt}px) brightness(${Math.pow(2, exposureAdj + isoStops)})`;
+					ctx.filter = `blur(${blurAmt}px) brightness(${Math.pow(2, totalStops)})`;
 					// redraw original through filter
 					if(originalImageData){ ctx.putImageData(originalImageData,0,0); } else { drawOriginal(); }
 					ctx.filter = 'none';
@@ -872,7 +881,7 @@
 					// fallback: adjust brightness by reading pixels
 					const imgd = ctx.getImageData(0,0,canvas.width,canvas.height);
 					const d = imgd.data;
-					const bright = Math.pow(2, exposureAdj + isoStops);
+					const bright = Math.pow(2, totalStops);
 					for(let i=0;i<d.length;i+=4){ d[i] = Math.min(255, d[i]*bright); d[i+1] = Math.min(255, d[i+1]*bright); d[i+2] = Math.min(255, d[i+2]*bright); }
 					ctx.putImageData(imgd,0,0);
 				}
@@ -890,6 +899,23 @@
 					}
 					ctx.putImageData(imgd2,0,0);
 				}
+
+				// Apply oblique lighting as a subtle directional overlay gradient
+				if(oblique){
+					const deg = parseFloat(oblique || 10);
+					const rad = deg * Math.PI / 180.0;
+					const dx = Math.cos(rad), dy = Math.sin(rad) * 0.6;
+					const g = ctx.createLinearGradient(canvas.width*(0.5-dx*0.6), canvas.height*(0.5-dy*0.6), canvas.width*(0.5+dx*0.6), canvas.height*(0.5+dy*0.6));
+					const alpha = Math.min(0.45, 0.03 * deg);
+					g.addColorStop(0, `rgba(255,255,220,${alpha})`);
+					g.addColorStop(0.4, `rgba(255,255,220,${alpha*0.55})`);
+					g.addColorStop(0.8, `rgba(255,255,220,${alpha*0.18})`);
+					g.addColorStop(1, `rgba(255,255,220,0)`);
+					ctx.globalCompositeOperation = 'overlay';
+					ctx.fillStyle = g;
+					ctx.fillRect(0,0,canvas.width,canvas.height);
+					ctx.globalCompositeOperation = 'source-over';
+				}
 			}
 
 			// initialize image
@@ -901,7 +927,9 @@
 						iso: document.getElementById('iso-slider').value,
 						aperture: document.getElementById('aperture-slider').value,
 						shutter: document.getElementById('shutter-slider').value,
-						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on')
+						exposure: document.getElementById('exposure-slider').value,
+						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on'),
+						oblique: document.getElementById('obliqueBtn') && document.getElementById('obliqueBtn').getAttribute('data-oblique')
 					};
 					applyEffects(user);
 					const ev2 = parseFloat(document.getElementById('exposure-slider').value);
@@ -926,7 +954,7 @@
 						flashBtn2.setAttribute('aria-checked', isOn ? 'true' : 'false');
 						const s = flashBtn2.querySelector('span'); if(s) s.textContent = isOn ? 'On' : 'Off';
 						// reapply effects to reflect flash immediately
-						applyEffects({aperture: document.getElementById('aperture-slider').value, shutter: document.getElementById('shutter-slider').value, iso: document.getElementById('iso-slider').value, flash: isOn});
+						applyEffects({aperture: document.getElementById('aperture-slider').value, shutter: document.getElementById('shutter-slider').value, iso: document.getElementById('iso-slider').value, flash: isOn, exposure: document.getElementById('exposure-slider').value, oblique: document.getElementById('obliqueBtn') && document.getElementById('obliqueBtn').getAttribute('data-oblique')});
 					});
 				}
 			document.getElementById('fl-try').addEventListener('click', ()=>{ closeResultModal(); });
@@ -977,8 +1005,8 @@
 					</div>
 					<div class="controls-inner">
 						<div class="control-group" >
-							<div class="control-label">&#9673; APERTURE: <span id="aperture-val">10</span></div>
-							<input type="range" min="7.1" max="11" value="10" step="0.1" class="control-slider" id="aperture-slider">
+							<div class="control-label">&#9673; APERTURE: <span id="aperture-val">8</span></div>
+							<input type="range" min="7.1" max="11" value="8" step="0.1" class="control-slider" id="aperture-slider">
 							<div class="ticks" aria-hidden="true">
 								<span style="left:0%"></span><label style="left:0%">f/7.1</label>
 								<span style="left:25%"></span><label style="left:25%">f/8</label>
@@ -988,7 +1016,7 @@
 							</div>
 						</div>
 						<div class="control-group">
-							<div class="control-label">&#128336; SHUTTER SPEED: <span id="shutter-val">1/400 SEC</span></div>
+							<div class="control-label">&#128336; SHUTTER SPEED: <span id="shutter-val">1/125</span></div>
 							<input type="range" min="80" max="250" value="125" step="1" class="control-slider" id="shutter-slider">
 							<div class="ticks" aria-hidden="true">
 								<span style="left:0%"></span><label style="left:0%">1/80</label>
