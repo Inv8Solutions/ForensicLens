@@ -607,19 +607,22 @@
 					gl.bindVertexArray(quad.vao);
 					gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texB);
 					gl.uniform1i(gl.getUniformLocation(programs.final,'u_tex'), 0);
-					// compute brightness from shutter/iso/exposure (and flash)
-					const shutterVal = parseFloat(params.shutter) || 125;
-					const exposureAdj = Math.log2(125 / shutterVal);
-					const isoVal = parseFloat(params.iso) || 400;
-					const isoStops = Math.log2(isoVal / 400);
+					// compute brightness from shutter (seconds)/iso/aperture/exposure (stops)
+					// Level3 baseline: shutter baseline 1s, ISO baseline 200
+					const shutterVal = parseFloat(params.shutter) || 1.0; // shutter in seconds
+					const exposureAdj = Math.log2(1.0 / shutterVal);
+					const isoVal = parseFloat(params.iso) || 200;
+					const isoStops = Math.log2(isoVal / 200);
+					const fAperture = parseFloat(params.aperture) || 14.0;
+					const apertureStops = 2.0 * Math.log2(16.0 / fAperture);
 					const exposureSlider = parseFloat(params.exposure || 0);
-					const totalStops = exposureAdj + isoStops + exposureSlider;
+					const totalStops = exposureAdj + isoStops + apertureStops + exposureSlider;
 					let brightness = Math.pow(2, totalStops);
 					if(params.flash){ // flash adds roughly +2 stops (bright quick burst)
 						brightness *= 4.0;
 					}
 					gl.uniform1f(gl.getUniformLocation(programs.final,'u_brightness'), brightness);
-					const noiseStrength = Math.max(0, (isoVal - 200) / 1600);
+					const noiseStrength = Math.max(0, (isoVal - 100) / 400);
 					gl.uniform1f(gl.getUniformLocation(programs.final,'u_noise'), noiseStrength * 0.06);
 					gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 				}
@@ -635,16 +638,17 @@
 				function getCurrentValues(){
 					return {
 						aperture: document.getElementById('aperture-slider').value,
-						shutter: document.getElementById('shutter-slider').value,
+						shutter: document.getElementById('shutter-slider').value, // seconds
 						iso: document.getElementById('iso-slider').value,
 						exposure: document.getElementById('exposure-slider').value,
-						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on')
+						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on'),
+						oblique: document.getElementById('obliqueBtn') && document.getElementById('obliqueBtn').getAttribute('data-oblique')
 					};
 				}
 
 				function updateLabels(){
 					const ap = document.getElementById('aperture-val'); if(ap) ap.textContent = 'f/' + document.getElementById('aperture-slider').value;
-					const sh = document.getElementById('shutter-val'); if(sh) sh.textContent = '1/' + document.getElementById('shutter-slider').value;
+					const sh = document.getElementById('shutter-val'); if(sh) sh.textContent = document.getElementById('shutter-slider').value + ' s';
 					const iso = document.getElementById('iso-val'); if(iso) iso.textContent = document.getElementById('iso-slider').value;
 				}
 
@@ -671,7 +675,7 @@
 					if(gl && programs) renderGL(user); else scheduleApply();
 					const ev = parseFloat(document.getElementById('exposure-slider').value);
 					const ok = Math.abs(ev) <= 0.6;
-					openResultModal({ok, user, ideal: {iso:200, aperture:8, shutter:125}});
+					openResultModal({ok, user, ideal: {iso:200, aperture:16, shutter:1}});
 				});
 
 				// Reset restores defaults and original image
@@ -843,52 +847,66 @@
 			}
 
 			// very small gaussian blur approximation using canvas filter when available
-				function applyEffects({aperture, shutter, iso, flash}){
+				function applyEffects({aperture, shutter, iso, flash, exposure, oblique}){
 				if(!ctx) return;
 				fitCanvas();
 				// Start from original
 				if(originalImageData){ ctx.putImageData(originalImageData,0,0); }
-				// compute blur from aperture: smaller aperture (higher f-number) = more depth -> less blur.
-				// our aperture slider uses numeric f-values where larger = smaller opening. We'll invert: lower f -> more blur
-				const f = parseFloat(aperture);
-				const blurAmt = Math.max(0, (10 - f) * 1.2); // rough mapping
+				// compute blur from aperture: in Level3 aperture range is f/12 - f/16, smaller aperture = less blur
+				const f = parseFloat(aperture || 14.0);
+				const blurAmt = Math.max(0, (14.0 / f - 1.0) * 2.5);
 
-				// compute exposure change from shutter: faster shutter (higher denominator) -> darker image
-				const shutterVal = parseFloat(shutter); // shutter slider gives denominator like 125
-				const exposureAdj = Math.log2(125 / shutterVal || 1); // relative stops to baseline 125
-
-				// compute ISO effect (noise + slight brightness); baseline 400
-				const isoVal = parseFloat(iso);
-				const isoStops = Math.log2(isoVal / 400 || 1);
+				// compute exposure from shutter (seconds), ISO baseline 200, aperture relative to f/16
+				const shutterVal = parseFloat(shutter) || 1.0; // seconds
+				const exposureAdj = Math.log2(1.0 / shutterVal);
+				const isoVal = parseFloat(iso) || 200;
+				const isoStops = Math.log2(isoVal / 200 || 1);
+				const apertureStops = 2.0 * Math.log2(16.0 / f);
+				const exposureSlider = parseFloat(exposure || 0);
+				const totalStops = exposureAdj + isoStops + apertureStops + exposureSlider;
 
 				// Use canvas filter when available for blur and brightness
 				const supportsFilter = 'filter' in ctx;
 				if(supportsFilter){
-					ctx.filter = `blur(${blurAmt}px) brightness(${Math.pow(2, exposureAdj + isoStops)})`;
-					// redraw original through filter
+					ctx.filter = `blur(${blurAmt}px) brightness(${Math.pow(2, totalStops)})`;
 					if(originalImageData){ ctx.putImageData(originalImageData,0,0); } else { drawOriginal(); }
 					ctx.filter = 'none';
 				} else {
-					// fallback: adjust brightness by reading pixels
 					const imgd = ctx.getImageData(0,0,canvas.width,canvas.height);
 					const d = imgd.data;
-					const bright = Math.pow(2, exposureAdj + isoStops);
+					const bright = Math.pow(2, totalStops);
 					for(let i=0;i<d.length;i+=4){ d[i] = Math.min(255, d[i]*bright); d[i+1] = Math.min(255, d[i+1]*bright); d[i+2] = Math.min(255, d[i+2]*bright); }
 					ctx.putImageData(imgd,0,0);
 				}
 
-				// Add noise for ISO
-				const noiseStrength = Math.max(0, (isoVal - 200) / 1600); // 400 -> small, 800 -> higher
+				// Add noise for ISO (Level3 low ISO range -> small noise)
+				const noiseStrength = Math.max(0, (isoVal - 100) / 400);
 				if(noiseStrength > 0){
 					const imgd2 = ctx.getImageData(0,0,canvas.width,canvas.height);
 					const d2 = imgd2.data;
 					for(let i=0;i<d2.length;i+=4){
-						const rnd = (Math.random()-0.5) * 255 * noiseStrength * 0.4; // subtle
+						const rnd = (Math.random()-0.5) * 255 * noiseStrength * 0.25;
 						d2[i] = Math.max(0, Math.min(255, d2[i] + rnd));
 						d2[i+1] = Math.max(0, Math.min(255, d2[i+1] + rnd));
 						d2[i+2] = Math.max(0, Math.min(255, d2[i+2] + rnd));
 					}
 					ctx.putImageData(imgd2,0,0);
+				}
+
+				// Apply oblique lighting overlay if provided
+				if(oblique){
+					const deg = parseFloat(oblique || 10);
+					const rad = deg * Math.PI / 180.0;
+					const dx = Math.cos(rad), dy = Math.sin(rad) * 0.6;
+					const g = ctx.createLinearGradient(canvas.width*(0.5-dx*0.6), canvas.height*(0.5-dy*0.6), canvas.width*(0.5+dx*0.6), canvas.height*(0.5+dy*0.6));
+					const alpha = Math.min(0.35, 0.025 * deg);
+					g.addColorStop(0, `rgba(255,240,220,${alpha})`);
+					g.addColorStop(0.5, `rgba(255,240,220,${alpha*0.4})`);
+					g.addColorStop(1, `rgba(255,240,220,0)`);
+					ctx.globalCompositeOperation = 'overlay';
+					ctx.fillStyle = g;
+					ctx.fillRect(0,0,canvas.width,canvas.height);
+					ctx.globalCompositeOperation = 'source-over';
 				}
 			}
 
@@ -911,8 +929,14 @@
 
 				// reset handler for 2D fallback
 				document.getElementById('resetBtn').addEventListener('click', ()=>{
+					// Level3 defaults
+					document.getElementById('iso-slider').value = 200;
+					document.getElementById('aperture-slider').value = 14;
+					document.getElementById('shutter-slider').value = 1;
+					document.getElementById('exposure-slider').value = 0;
 					drawOriginal();
 					const fbtn = document.getElementById('flashToggle'); if(fbtn){ fbtn.classList.remove('on'); fbtn.classList.add('off'); fbtn.setAttribute('aria-checked','false'); const s = fbtn.querySelector('span'); if(s) s.textContent = 'Off'; }
+					updateLabels(); if(gl && programs) { renderGL(getCurrentValues()); } else { applyEffects(getCurrentValues()); }
 					closeResultModal();
 				});
 
@@ -926,7 +950,7 @@
 						flashBtn2.setAttribute('aria-checked', isOn ? 'true' : 'false');
 						const s = flashBtn2.querySelector('span'); if(s) s.textContent = isOn ? 'On' : 'Off';
 						// reapply effects to reflect flash immediately
-						applyEffects({aperture: document.getElementById('aperture-slider').value, shutter: document.getElementById('shutter-slider').value, iso: document.getElementById('iso-slider').value, flash: isOn});
+						applyEffects({aperture: document.getElementById('aperture-slider').value, shutter: document.getElementById('shutter-slider').value, iso: document.getElementById('iso-slider').value, flash: isOn, exposure: document.getElementById('exposure-slider').value, oblique: document.getElementById('obliqueBtn') && document.getElementById('obliqueBtn').getAttribute('data-oblique')});
 					});
 				}
 			document.getElementById('fl-try').addEventListener('click', ()=>{ closeResultModal(); });
@@ -977,35 +1001,31 @@
 					</div>
 					<div class="controls-inner">
 						<div class="control-group" >
-							<div class="control-label">&#9673; APERTURE: <span id="aperture-val">10</span></div>
-							<input type="range" min="7.1" max="11" value="10" step="0.1" class="control-slider" id="aperture-slider">
+							<div class="control-label">&#9673; APERTURE: <span id="aperture-val">14</span></div>
+							<!-- Level 3 uses f/12 - f/16 -->
+							<input type="range" min="12" max="16" value="14" step="0.5" class="control-slider" id="aperture-slider">
 							<div class="ticks" aria-hidden="true">
-								<span style="left:0%"></span><label style="left:0%">f/7.1</label>
-								<span style="left:25%"></span><label style="left:25%">f/8</label>
-								<span style="left:50%"></span><label style="left:50%">f/9</label>
-								<span style="left:75%"></span><label style="left:75%">f/10</label>
-								<span style="left:100%"></span><label style="left:100%">f/11</label>
+								<span style="left:0%"></span><label style="left:0%">f/12</label>
+								<span style="left:33%"></span><label style="left:33%">f/13</label>
+								<span style="left:66%"></span><label style="left:66%">f/14</label>
+								<span style="left:100%"></span><label style="left:100%">f/16</label>
 							</div>
 						</div>
 						<div class="control-group">
-							<div class="control-label">&#128336; SHUTTER SPEED: <span id="shutter-val">1/400 SEC</span></div>
-							<input type="range" min="80" max="250" value="125" step="1" class="control-slider" id="shutter-slider">
+							<div class="control-label">&#128336; SHUTTER SPEED: <span id="shutter-val">1 s</span></div>
+							<!-- Level 3 requires long exposure 1 second; provide a hidden input to carry the value and a display --><input type="hidden" id="shutter-slider" value="1">
 							<div class="ticks" aria-hidden="true">
-								<span style="left:0%"></span><label style="left:0%">1/80</label>
-								<span style="left:25%"></span><label style="left:25%">1/125</label>
-								<span style="left:50%"></span><label style="left:50%">1/200</label>
-								<span style="left:100%"></span><label style="left:100%">1/250</label>
+								<span style="left:0%"></span><label style="left:0%">1 s</label>
 							</div>
 						</div>
 						<div class="control-group">
-							<div class="control-label">&#9728; ISO: <span id="iso-val">400</span></div>
-							<input type="range" min="400" max="800" value="400" step="100" class="control-slider" id="iso-slider">
+							<div class="control-label">&#9728; ISO: <span id="iso-val">200</span></div>
+							<!-- Level 3 ISO 200 - 400 -->
+							<input type="range" min="200" max="400" value="200" step="50" class="control-slider" id="iso-slider">
 							<div class="ticks" aria-hidden="true">
-								<span style="left:0%"></span><label style="left:0%">400</label>
-								<span style="left:25%"></span><label style="left:25%">500</label>
-								<span style="left:50%"></span><label style="left:50%">600</label>
-								<span style="left:75%"></span><label style="left:75%">700</label>
-								<span style="left:100%"></span><label style="left:100%">800</label>
+								<span style="left:0%"></span><label style="left:0%">200</label>
+								<span style="left:50%"></span><label style="left:50%">300</label>
+								<span style="left:100%"></span><label style="left:100%">400</label>
 							</div>
 						</div>
 						<div class="controls-btns">
