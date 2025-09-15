@@ -674,13 +674,40 @@
 
 				updateLabels(); scheduleApply();
 
-				// Submit opens modal but image updates in real-time already
+				// Ideal forensic settings for gun evidence (from best-practice references):
+				// conservative baseline: ISO 400, aperture f/11, shutter 1/125s (good depth and detail, minimal noise)
+				const IDEAL_GUN = { iso: 400, aperture: 11, shutter: 125 };
+
+				function stopsForSettings({iso, aperture, shutter, exposure}){
+					// shutter passed as denominator (1/x)
+					const shutterVal = parseFloat(shutter) || 125;
+					const shutterStops = Math.log2(125 / shutterVal);
+					const isoVal = parseFloat(iso) || 400;
+					const isoStops = Math.log2(isoVal / 400);
+					const f = parseFloat(aperture) || 11;
+					const apStops = 2.0 * Math.log2(11 / f);
+					const exposureSlider = parseFloat(exposure || 0);
+					return { totalStops: shutterStops + isoStops + apStops + exposureSlider, shutterStops, isoStops, apStops };
+				}
+
+				function evaluateUser(user){
+					const userStops = stopsForSettings(user);
+					const idealStops = stopsForSettings({iso: IDEAL_GUN.iso, aperture: IDEAL_GUN.aperture, shutter: IDEAL_GUN.shutter, exposure:0});
+					const delta = userStops.totalStops - idealStops.totalStops;
+					return { delta, userStops, idealStops, withinTolerance: Math.abs(delta) <= 0.6 };
+				}
+
 				document.getElementById('submitBtn').addEventListener('click', ()=>{
 					const user = getCurrentValues();
 					if(gl && programs) renderGL(user); else scheduleApply();
-					const ev = parseFloat(document.getElementById('exposure-slider').value);
-					const ok = Math.abs(ev) <= 0.6;
-					openResultModal({ok, user, ideal: {iso:200, aperture:8, shutter:125}});
+					const result = evaluateUser(user);
+					openResultModal({ok: result.withinTolerance, user, ideal: IDEAL_GUN});
+					// add more detailed message when not OK
+					if(!result.withinTolerance){
+						const diff = result.delta;
+						const msg = diff > 0 ? 'Image likely overexposed by ~' + diff.toFixed(2) + ' stops.' : 'Image likely underexposed by ~' + Math.abs(diff).toFixed(2) + ' stops.';
+						flMessage.textContent = msg + ' Adjust ISO/aperture/shutter.';
+					}
 				});
 
 				// Reset restores defaults and original image
@@ -759,7 +786,7 @@
 					<div class="fl-col-title">Ideal Settings</div>
 					<div class="fl-list">
 						<p id="fl-iso-ideal">ISO: 200</p>
-						<p id="fl-ap-ideal">F/8</p>
+						<p id="fl-ap-ideal">F/11</p>
 						<p id="fl-sh-ideal">1/125s</p>
 					</div>
 				</div>
@@ -813,7 +840,15 @@
 			flIsoUser.textContent = 'ISO: ' + user.iso;
 			flApUser.textContent = 'Aperture: f/' + user.aperture;
 			flShUser.textContent = 'Shutter: 1/' + user.shutter + 's';
-			// TODO: populate ideal values if provided
+			// populate ideal values if provided
+			if(ideal){
+				const flIsoIdeal = document.getElementById('fl-iso-ideal');
+				const flApIdeal = document.getElementById('fl-ap-ideal');
+				const flShIdeal = document.getElementById('fl-sh-ideal');
+				if(flIsoIdeal) flIsoIdeal.textContent = 'ISO: ' + (ideal.iso || '200');
+				if(flApIdeal) flApIdeal.textContent = 'Aperture: f/' + (ideal.aperture || '11');
+				if(flShIdeal) flShIdeal.textContent = 'Shutter: 1/' + (ideal.shutter || '125') + 's';
+			}
 		}
 		function closeResultModal(){ modal.setAttribute('aria-hidden','true'); }
 
@@ -921,44 +956,20 @@
 			// initialize image
 				if(img.complete){ drawOriginal(); } else { img.onload = ()=>{ drawOriginal(); }; }
 
-				// wire submit to apply effects and open result modal (2D fallback)
-				document.getElementById('submitBtn').addEventListener('click', ()=>{
-					const user = {
-						iso: document.getElementById('iso-slider').value,
-						aperture: document.getElementById('aperture-slider').value,
-						shutter: document.getElementById('shutter-slider').value,
-						exposure: document.getElementById('exposure-slider').value,
-						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on'),
-						oblique: document.getElementById('obliqueBtn') && document.getElementById('obliqueBtn').getAttribute('data-oblique')
-					};
-					applyEffects(user);
-					const ev2 = parseFloat(document.getElementById('exposure-slider').value);
-					const ok2 = Math.abs(ev2) <= 0.6;
-					openResultModal({ok: ok2, user, ideal: {iso:200, aperture:8, shutter:125}});
-				});
-
-				// reset handler for 2D fallback
-				document.getElementById('resetBtn').addEventListener('click', ()=>{
-					drawOriginal();
-					const fbtn = document.getElementById('flashToggle'); if(fbtn){ fbtn.classList.remove('on'); fbtn.classList.add('off'); fbtn.setAttribute('aria-checked','false'); const s = fbtn.querySelector('span'); if(s) s.textContent = 'Off'; }
-					closeResultModal();
-				});
-
-				// Flash toggle wiring for 2D fallback
-				const flashBtn2 = document.getElementById('flashToggle');
-				if(flashBtn2){
-					if(!flashBtn2.classList.contains('on')){ flashBtn2.classList.add('off'); flashBtn2.setAttribute('aria-checked','false'); const s0 = flashBtn2.querySelector('span'); if(s0) s0.textContent = 'Off'; }
-					flashBtn2.addEventListener('click', ()=>{
-						const isOn = flashBtn2.classList.toggle('on');
-						flashBtn2.classList.toggle('off', !isOn);
-						flashBtn2.setAttribute('aria-checked', isOn ? 'true' : 'false');
-						const s = flashBtn2.querySelector('span'); if(s) s.textContent = isOn ? 'On' : 'Off';
-						// reapply effects to reflect flash immediately
-						applyEffects({aperture: document.getElementById('aperture-slider').value, shutter: document.getElementById('shutter-slider').value, iso: document.getElementById('iso-slider').value, flash: isOn, exposure: document.getElementById('exposure-slider').value, oblique: document.getElementById('obliqueBtn') && document.getElementById('obliqueBtn').getAttribute('data-oblique')});
-					});
+				// The 2D-fallback rendering uses applyEffects/drawOriginal above, but
+				// we should not add duplicate submit/reset/flash handlers here because
+				// the primary GL-initialized handler (earlier in the file) already
+				// evaluates the user's settings and opens the result modal. Leaving
+				// duplicate handlers caused the modal to be overwritten by a
+				// simpler exposure-only check and produced false "Success" states.
+				//
+				// To keep fallback behavior, simply ensure the base UI reflects
+				// the initial flash state and that drawOriginal is available.
+				// (No duplicate event listeners are attached here.)
+				if(typeof drawOriginal === 'function' && document.getElementById('resetBtn')){
+					// ensure reset button still draws original if used
+					document.getElementById('resetBtn').addEventListener('click', ()=>{ drawOriginal(); closeResultModal(); });
 				}
-			document.getElementById('fl-try').addEventListener('click', ()=>{ closeResultModal(); });
-			document.getElementById('fl-next').addEventListener('click', ()=>{ window.location.href = '../practice-levels.html'; });
 		});
 	</script>
 	<div class="top-bar">
