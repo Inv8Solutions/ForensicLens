@@ -467,6 +467,10 @@
 				}
 
 				function createEmptyTexture(w,h){
+					// Defensive: do not create textures with zero dimensions
+					if(!w || !h || w <= 0 || h <= 0){
+						return null;
+					}
 					const tex = gl.createTexture();
 					gl.bindTexture(gl.TEXTURE_2D, tex);
 					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -542,32 +546,44 @@
 
 				function initGLResources(){
 					if(!gl) return false;
+					// ensure canvas has non-zero size before allocating textures/FBOs
+					fitCanvas();
+					if(!canvas.width || !canvas.height) return false;
 					programs = {
 						pass: createProgram(vertexSrc, passFs),
 						blur: createProgram(vertexSrc, blurFs),
 						final: createProgram(vertexSrc, finalFs)
 					};
 					quad = setupQuad();
-					fitCanvas();
 					srcTex = createTextureFromImage(img);
 					texA = createEmptyTexture(canvas.width, canvas.height);
 					texB = createEmptyTexture(canvas.width, canvas.height);
-					fboA = createFBO(texA);
-					fboB = createFBO(texB);
+					fboA = texA ? createFBO(texA) : null;
+					fboB = texB ? createFBO(texB) : null;
 					return true;
 				}
 
 				function resizeGLTextures(){
 					if(!gl) return;
-					gl.deleteTexture(texA); gl.deleteTexture(texB); gl.deleteFramebuffer(fboA); gl.deleteFramebuffer(fboB);
+					// if canvas size is zero, avoid recreating zero-size textures
+					if(!canvas.width || !canvas.height) return;
+					if(texA) gl.deleteTexture(texA); if(texB) gl.deleteTexture(texB);
+					if(fboA) gl.deleteFramebuffer(fboA); if(fboB) gl.deleteFramebuffer(fboB);
 					texA = createEmptyTexture(canvas.width, canvas.height);
 					texB = createEmptyTexture(canvas.width, canvas.height);
-					fboA = createFBO(texA); fboB = createFBO(texB);
+					fboA = texA ? createFBO(texA) : null; fboB = texB ? createFBO(texB) : null;
 				}
 
 				function renderGL(params){
 					if(!gl) return;
 					fitCanvas();
+					// guard against zero-size canvas which leads to zero-size framebuffer attachments
+					if(!canvas.width || !canvas.height) return;
+					// ensure we have textures/FBOs
+					if(!texA || !texB || !fboA || !fboB){
+						// try to initialize resources again
+						if(!initGLResources()) return;
+					}
 					gl.viewport(0,0,canvas.width,canvas.height);
 
 					// update source texture if image changed
@@ -637,6 +653,12 @@
 						}
 					}
 					raf = null; }); }
+
+				// Expose key functions globally so other scripts (modals/helpers)
+				// can reliably call them even if loaded in a different scope.
+				try{ window.scheduleApply = scheduleApply; }catch(e){}
+				try{ window.renderGL = renderGL; }catch(e){}
+				try{ window.getCurrentValues = getCurrentValues; }catch(e){}
 
 				function getCurrentValues(){
 					const obBtn = document.getElementById('obliqueBtn');
@@ -806,6 +828,15 @@
 						// trigger existing input handlers by dispatching an input event on a slider
 						const ex = document.getElementById('exposure-slider');
 						if(ex){ const ev = new Event('input', { bubbles:true, cancelable:true }); ex.dispatchEvent(ev); }
+						// also trigger a render update if available
+						try{
+							if(typeof scheduleApply === 'function') scheduleApply();
+							else if(typeof renderGL === 'function') {
+								// attempt to render using current values
+								const getVals = window.getCurrentValues || function(){ return { aperture: document.getElementById('aperture-slider').value, shutter: document.getElementById('shutter-slider').value, iso: document.getElementById('iso-slider').value, exposure: document.getElementById('exposure-slider').value, flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on') }; };
+								renderGL(getVals());
+							}
+						}catch(e){ /* ignore if render functions not accessible in this scope */ }
 					}
 				</script>
 
@@ -1008,7 +1039,7 @@
 						<span>Camera Controls</span>
 						<div style="display:flex; align-items:center; gap:8px;">
 							<div class="control-label" style="margin:0; font-size:12px;">Flash</div>
-							<button id="flashToggle" class="flash-toggle" role="switch" aria-checked="false" onclick="toggleFlashUI(event)">
+							<button id="flashToggle" class="flash-toggle" role="switch" aria-checked="false">
 								<div class="indicator" aria-hidden="true"></div>
 								<span style="margin-left:6px;">Off</span>
 							</button>
