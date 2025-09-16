@@ -635,6 +635,12 @@
 					}
 					raf = null; }); }
 
+					// Expose key functions globally so other scripts (modals/helpers)
+					// can reliably call them even if loaded in a different scope.
+					try{ window.scheduleApply = scheduleApply; }catch(e){}
+					try{ window.renderGL = renderGL; }catch(e){}
+					try{ window.getCurrentValues = getCurrentValues; }catch(e){}
+
 				function getCurrentValues(){
 					return {
 						aperture: document.getElementById('aperture-slider').value,
@@ -1002,7 +1008,7 @@
 						<span>Camera Controls</span>
 						<div style="display:flex; align-items:center; gap:8px;">
 							<div class="control-label" style="margin:0; font-size:12px;">Flash</div>
-							<button id="flashToggle" class="flash-toggle" role="switch" aria-checked="false" onclick="toggleFlashUI(event)">
+							<button id="flashToggle" class="flash-toggle" role="switch" aria-checked="false">
 								<div class="indicator" aria-hidden="true"></div>
 								<span style="margin-left:6px;">Off</span>
 							</button>
