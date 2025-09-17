@@ -733,7 +733,16 @@
 		<div class="fl-modal" role="dialog" aria-modal="true">
 			<div class="fl-icon" id="fl-icon">
 				<!-- icon injected via class -->
-			</div>
+						</div>
+						<script>
+							(function(){
+								const btn = document.getElementById('moreOptionsBtn');
+								const panel = document.getElementById('moreOptionsPanel');
+								if(!btn || !panel) return;
+								btn.addEventListener('click', function(e){ e.stopPropagation(); const open = panel.style.display !== 'block'; panel.style.display = open ? 'block' : 'none'; btn.setAttribute('aria-expanded', open ? 'true' : 'false'); panel.setAttribute('aria-hidden', open ? 'false' : 'true'); });
+								document.addEventListener('click', function(ev){ if(panel.style.display === 'none') return; if(!panel.contains(ev.target) && ev.target !== btn){ panel.style.display = 'none'; btn.setAttribute('aria-expanded','false'); panel.setAttribute('aria-hidden','true'); } });
+							})();
+						</script>
 			<h2 id="fl-heading">Success!</h2>
 			<p id="fl-message">Perfect! The details are clearly documented</p>
 
@@ -968,11 +977,21 @@
 					<div class="controls-title" style="display:flex; justify-content:space-between; align-items:center;">
 						<span>Camera Controls</span>
 						<div style="display:flex; align-items:center; gap:8px;">
-							<div class="control-label" style="margin:0; font-size:12px;">Flash</div>
-							<button id="flashToggle" class="flash-toggle" role="switch" aria-checked="false" onclick="toggleFlashUI(event)">
-								<div class="indicator" aria-hidden="true"></div>
-								<span style="margin-left:6px;">Off</span>
+							<!-- More Options button: toggles the hidden panel with additional controls -->
+							<button id="moreOptionsBtn" class="btn more-options" aria-label="More Options" title="More Options" aria-expanded="false" aria-controls="moreOptionsPanel">
+								<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 8a2 2 0 100-4 2 2 0 000 4zm0 6a2 2 0 100-4 2 2 0 000 4zm0 6a2 2 0 100-4 2 2 0 000 4z" fill="currentColor"/></svg>
 							</button>
+						</div>
+						<!-- Hidden More Options panel: contains the Flash toggle moved here -->
+						<div id="moreOptionsPanel" class="more-options-panel" aria-hidden="true" style="display:none; position:absolute; right:0; top:44px; background:#fff; border:1px solid #ddd; padding:10px; border-radius:6px; box-shadow:0 6px 20px rgba(0,0,0,0.12); z-index:120; min-width:160px;">
+							<div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+								<div class="control-label" style="margin:0; font-size:12px;">Flash</div>
+								<!-- Flash toggle moved here (id preserved so existing JS still targets it) -->
+								<button id="flashToggle" class="flash-toggle" role="switch" aria-checked="false">
+									<div class="indicator" aria-hidden="true"></div>
+									<span style="margin-left:6px;">Off</span>
+								</button>
+							</div>
 						</div>
 					</div>
 					<div class="controls-inner">
