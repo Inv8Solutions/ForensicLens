@@ -384,6 +384,25 @@
 				.flash-toggle.off { background: linear-gradient(90deg,#ff9b9b,#ff4f4f); color:#330606; box-shadow:0 6px 18px rgba(255,79,79,0.10); }
 				.flash-toggle.off .indicator { background: #330606; border-color: #5a0b0b; }
 			</style>
+
+			<style>
+				/* Lighting option buttons */
+				.lighting-list { display:flex; }
+				.lighting-option {
+					background: #171718;
+					color: #ddd;
+					border: 1px solid #2b2b2b;
+					padding: 8px 10px;
+					border-radius: 8px;
+					font-weight:600;
+					cursor: pointer;
+				}
+				.lighting-option[aria-pressed="true"] {
+					background: linear-gradient(90deg,#2b7eeb,#2ad1d1);
+					color: #04121a;
+					box-shadow: 0 6px 16px rgba(42,209,209,0.12);
+				}
+			</style>
 	<script>
 			// Simple toast for submit feedback
 			function showToast(msg) {
@@ -406,6 +425,41 @@
 				setTimeout(()=>{ if(t) t.remove(); }, 1800);
 			}
 
+			// Global helper: simulate a camera flash overlay and trigger rendering
+			function flashOverlay(duration = 220){
+				const canvas = document.getElementById('photo-canvas');
+				if(!canvas) return;
+				let ov = document.getElementById('flash-overlay');
+				if(!ov){
+					ov = document.createElement('div');
+					ov.id = 'flash-overlay';
+					ov.style.position = 'absolute';
+					ov.style.pointerEvents = 'none';
+					ov.style.background = '#fff';
+					ov.style.opacity = '0';
+					ov.style.transition = `opacity ${duration}ms ease-out`;
+					document.body.appendChild(ov);
+				}
+				const rect = canvas.getBoundingClientRect();
+				ov.style.left = rect.left + 'px';
+				ov.style.top = rect.top + 'px';
+				ov.style.width = rect.width + 'px';
+				ov.style.height = rect.height + 'px';
+				ov.style.zIndex = 9997;
+				// trigger flash
+				requestAnimationFrame(()=>{ ov.style.opacity = '0.95'; setTimeout(()=>{ ov.style.opacity = '0'; }, Math.max(80, duration - 80)); });
+				// remove element after transition
+				setTimeout(()=>{ try{ ov.remove(); }catch(e){} }, duration + 160);
+			}
+
+			function simulateFlash(){
+				// quick overlay for user feedback
+				flashOverlay(220);
+				// trigger a re-render so any shader/2D pipeline updates (if present) run.
+				try{ updateCanvasFilter(); }catch(e){}
+				try{ if(typeof scheduleApply === 'function') scheduleApply(); }catch(e){}
+			}
+
 			// Reset and Submit handlers
 			document.addEventListener('DOMContentLoaded', ()=>{
 				// wire modal action buttons
@@ -423,6 +477,21 @@
 					canvas.width = Math.round(rect.width);
 					canvas.height = Math.round(rect.height);
 				}
+
+				// Shared lighting + flash state (global so other handlers can use it)
+				window._lightingType = window._lightingType || 'none';
+				window._persistentFlash = window._persistentFlash || false;
+
+				// Lighting buttons will swap the source image from ../level4/ instead of applying filters.
+				function updateCanvasFilter(){
+					const canvas = document.getElementById('photo-canvas'); if(!canvas) return;
+					// only persistent flash is applied via CSS filter now
+					const flashPart = window._persistentFlash ? ' brightness(4)' : '';
+					canvas.style.filter = flashPart.trim();
+				}
+
+				// expose helpers globally
+				window.updateCanvasFilter = updateCanvasFilter;
 
 				// Fallback 2D draw if WebGL unavailable
 				const fallbackCtx = !gl ? (canvas.getContext && canvas.getContext('2d')) : null;
@@ -557,6 +626,9 @@
 					return true;
 				}
 
+				// expose renderGL so simulateFlash can call it
+				window.renderGL = function(params){ try{ renderGL(params); }catch(e){} };
+
 				function resizeGLTextures(){
 					if(!gl) return;
 					gl.deleteTexture(texA); gl.deleteTexture(texB); gl.deleteFramebuffer(fboA); gl.deleteFramebuffer(fboB);
@@ -564,6 +636,8 @@
 					texB = createEmptyTexture(canvas.width, canvas.height);
 					fboA = createFBO(texA); fboB = createFBO(texB);
 				}
+				// make available globally so other scripts (modal) can call when source image changes
+				window.resizeGLTextures = resizeGLTextures;
 
 				function renderGL(params){
 					if(!gl) return;
@@ -631,6 +705,8 @@
 						}
 					}
 					raf = null; }); }
+				// expose scheduleApply globally so modal handlers can re-render after swapping source image
+				window.scheduleApply = scheduleApply;
 
 				function getCurrentValues(){
 					return {
@@ -683,6 +759,18 @@
 					updateLabels(); if(gl && programs) { renderGL(getCurrentValues()); } else { scheduleApply(); }
 					// reset flash visual state
 					const fbtnR = document.getElementById('flashToggle'); if(fbtnR){ fbtnR.classList.remove('on'); fbtnR.classList.add('off'); fbtnR.setAttribute('aria-checked','false'); const s = fbtnR.querySelector('span'); if(s) s.textContent = 'Off'; }
+					// clear lighting selection and canvas filters
+					const modal = document.getElementById('moreOptionsModal');
+					if(modal){
+						const btns = modal.querySelectorAll('.lighting-option');
+						btns.forEach(b=>{ b.setAttribute('aria-pressed','false'); });
+						const def = modal.querySelector('.lighting-option[data-type="none"]'); if(def) def.setAttribute('aria-pressed','true');
+						modal.style.display = 'none'; modal.setAttribute('aria-hidden','true');
+						const moreBtn = document.getElementById('moreOptionsBtn'); if(moreBtn) moreBtn.setAttribute('aria-expanded','false');
+					}
+					// clear persistent flash and update composed filter
+					window._persistentFlash = false;
+					const canvas = document.getElementById('photo-canvas'); updateCanvasFilter();
 					closeResultModal();
 				});
 
@@ -696,7 +784,13 @@
 						flashBtn.classList.toggle('off', !isOn);
 						flashBtn.setAttribute('aria-checked', isOn ? 'true' : 'false');
 						const s = flashBtn.querySelector('span'); if(s) s.textContent = isOn ? 'On' : 'Off';
+						// persistent flash state
+						window._persistentFlash = !!isOn;
+						updateCanvasFilter();
+						// trigger render
 						scheduleApply();
+						// initial flash overlay feedback when enabling
+						if(isOn){ try{ flashOverlay(220); }catch(e){} }
 					});
 				}
 			});
@@ -725,6 +819,96 @@
 			}
 		});
 	</script>
+		<script>
+			// Lighting options wiring: now uses the More Options modal
+			document.addEventListener('DOMContentLoaded', function(){
+				const modal = document.getElementById('moreOptionsModal');
+				const moreBtn = document.getElementById('moreOptionsBtn');
+				const closeBtn = document.getElementById('moreCloseBtn');
+				const lightBtns = modal ? modal.querySelectorAll('.lighting-option') : [];
+				const canvas = document.getElementById('photo-canvas');
+				const flashModalBtn = document.getElementById('flashToggleModal');
+				const flashMainBtn = document.getElementById('flashToggle');
+
+				function openModal(){ if(!modal) return; modal.style.display = 'flex'; modal.setAttribute('aria-hidden','false'); if(moreBtn) moreBtn.setAttribute('aria-expanded','true'); }
+				function closeModal(){ if(!modal) return; modal.style.display = 'none'; modal.setAttribute('aria-hidden','true'); if(moreBtn) moreBtn.setAttribute('aria-expanded','false'); }
+
+
+
+				if(moreBtn){ moreBtn.addEventListener('click', function(){ openModal(); }); }
+				if(closeBtn){ closeBtn.addEventListener('click', function(){ closeModal(); }); }
+
+				function applyLighting(type){
+					// Map lighting types to ready-made images in ../level4/
+					const imgEl = document.getElementById('source-image');
+					let src = '../assets/fingerprint.png'; // default
+						switch(type){
+						case 'diffused': src = '../level4/A. DiffusedLightingEffect.png'; break;
+						case 'oblique': src = '../level4/B. ObliqueLightingEffect.png'; break;
+						case 'transmitted': src = '../level4/C. TransmittedLightingEffect.png'; break;
+						case 'ultraviolet': src = '../level4/D. UltraVioletLightingEffect.png'; break;
+						case 'none':
+					default: src = '../assets/fingerprint.png'; break;
+					}
+					window._lightingType = type || 'none';
+					if(imgEl){
+						imgEl.src = src;
+						// ensure the image loads then render. Handle cached images by triggering
+						// resize and scheduleApply immediately if already complete.
+						imgEl.onload = function(){
+							try{ if(typeof resizeGLTextures === 'function') resizeGLTextures(); }catch(e){}
+							try{ if(typeof scheduleApply === 'function') scheduleApply(); }catch(e){}
+						};
+						// Also trigger immediately in case the image is cached and .onload won't fire
+						if(imgEl.complete){
+							try{ if(window.resizeGLTextures) window.resizeGLTextures(); }catch(e){}
+							try{ if(window.scheduleApply) window.scheduleApply(); }catch(e){}
+						}
+					}
+					updateCanvasFilter();
+				}
+
+				if(lightBtns && lightBtns.length){
+					lightBtns.forEach(btn=>{
+						btn.addEventListener('click', function(e){
+							const type = this.getAttribute('data-type') || 'none';
+							lightBtns.forEach(b=>{ b.setAttribute('aria-pressed','false'); });
+							this.setAttribute('aria-pressed','true');
+							applyLighting(type);
+						});
+					});
+					const def = modal.querySelector('.lighting-option[data-type="none"]'); if(def) def.setAttribute('aria-pressed','true');
+				}
+
+				// Flash toggle in modal should keep main flash UI in sync
+				if(flashModalBtn){
+					flashModalBtn.addEventListener('click', function(){
+						// toggle visual state
+						const isOn = flashModalBtn.classList.toggle('on');
+						flashModalBtn.classList.toggle('off', !isOn);
+						flashModalBtn.setAttribute('aria-checked', isOn ? 'true' : 'false');
+						const lbl = flashModalBtn.querySelector('span'); if(lbl) lbl.textContent = isOn ? 'On' : 'Off';
+						// mirror to main flash button if exists
+						if(flashMainBtn){ flashMainBtn.className = flashModalBtn.className; const lm = flashMainBtn.querySelector('span'); if(lm) lm.textContent = flashModalBtn.querySelector('span').textContent; flashMainBtn.setAttribute('aria-checked', isOn ? 'true' : 'false'); }
+						// persistent flash: update flag and filters
+						window._persistentFlash = !!isOn;
+						updateCanvasFilter();
+						// trigger render
+						const ex = document.getElementById('exposure-slider'); if(ex) ex.dispatchEvent(new Event('input',{bubbles:true}));
+						// initial flash overlay for feedback
+						if(isOn){ try{ flashOverlay(220); }catch(e){} }
+					});
+				}
+
+				// When modal opens, copy main flash state into modal toggle
+				if(flashMainBtn && flashModalBtn){
+					if(flashMainBtn.classList.contains('on')){ flashModalBtn.classList.add('on'); flashModalBtn.classList.remove('off'); flashModalBtn.setAttribute('aria-checked','true'); const s = flashModalBtn.querySelector('span'); if(s) s.textContent = 'On'; }
+				}
+
+				// close modal when clicking overlay
+				if(modal){ modal.addEventListener('click', function(e){ if(e.target === modal){ closeModal(); } }); }
+			});
+		</script>
 </head>
     
 	<body>
@@ -734,15 +918,7 @@
 			<div class="fl-icon" id="fl-icon">
 				<!-- icon injected via class -->
 						</div>
-						<script>
-							(function(){
-								const btn = document.getElementById('moreOptionsBtn');
-								const panel = document.getElementById('moreOptionsPanel');
-								if(!btn || !panel) return;
-								btn.addEventListener('click', function(e){ e.stopPropagation(); const open = panel.style.display !== 'block'; panel.style.display = open ? 'block' : 'none'; btn.setAttribute('aria-expanded', open ? 'true' : 'false'); panel.setAttribute('aria-hidden', open ? 'false' : 'true'); });
-								document.addEventListener('click', function(ev){ if(panel.style.display === 'none') return; if(!panel.contains(ev.target) && ev.target !== btn){ panel.style.display = 'none'; btn.setAttribute('aria-expanded','false'); panel.setAttribute('aria-hidden','true'); } });
-							})();
-						</script>
+						<!-- More options opens a modal (handled later) -->
 			<h2 id="fl-heading">Success!</h2>
 			<p id="fl-message">Perfect! The details are clearly documented</p>
 
@@ -785,6 +961,36 @@
 			<div class="fl-actions">
 				<button id="fl-try" class="fl-btn fl-ghost">Try Again</button>
 				<button id="fl-next" class="fl-btn fl-primary">Next Level</button>
+			</div>
+		</div>
+	</div>
+
+	<!-- More Options Modal -->
+	<div id="moreOptionsModal" class="fl-modal-overlay" aria-hidden="true">
+		<div class="fl-modal" role="dialog" aria-modal="true" aria-labelledby="moreOptionsHeading">
+			<h2 id="moreOptionsHeading">More Options</h2>
+			<div style="margin:8px 0 12px 0; color:#d1d1d1;">Additional controls for lighting and flash.</div>
+			<div style="display:flex; flex-direction:column; gap:12px;">
+				<div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+					<div class="control-label" style="margin:0; font-size:12px; color:#ddd;">Flash</div>
+					<button id="flashToggleModal" class="flash-toggle" role="switch" aria-checked="false">
+						<div class="indicator" aria-hidden="true"></div>
+						<span style="margin-left:6px;">Off</span>
+					</button>
+				</div>
+				<div>
+					<div class="control-label" style="margin:0 0 6px 0; font-size:12px; color:#ddd;">Lighting</div>
+					<div class="lighting-list" role="list" style="display:flex; gap:8px; flex-wrap:wrap;">
+						<button class="lighting-option" data-type="none" aria-pressed="false" title="None" style="flex:1; min-width:76px;">Normal</button>
+						<button class="lighting-option" data-type="diffused" aria-pressed="false" title="Diffused Lighting" style="flex:1; min-width:76px;">Diffused</button>
+						<button class="lighting-option" data-type="oblique" aria-pressed="false" title="Oblique Lighting" style="flex:1; min-width:76px;">Oblique</button>
+						<button class="lighting-option" data-type="transmitted" aria-pressed="false" title="Transmitted Lighting" style="flex:1; min-width:76px;">Transmitted</button>
+						<button class="lighting-option" data-type="ultraviolet" aria-pressed="false" title="Ultraviolet Lighting" style="flex:1; min-width:76px;">Ultraviolet</button>
+					</div>
+				</div>
+				<div style="display:flex; gap:8px; justify-content:flex-end; margin-top:6px;">
+					<button id="moreCloseBtn" class="fl-btn fl-ghost">Close</button>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -870,18 +1076,21 @@
 				const isoVal = parseFloat(iso);
 				const isoStops = Math.log2(isoVal / 400 || 1);
 
-				// Use canvas filter when available for blur and brightness
+					// Use canvas filter when available for blur and brightness
 				const supportsFilter = 'filter' in ctx;
 				if(supportsFilter){
-					ctx.filter = `blur(${blurAmt}px) brightness(${Math.pow(2, exposureAdj + isoStops)})`;
+						let brightnessFactor = Math.pow(2, exposureAdj + isoStops);
+						if(flash) brightnessFactor *= 4.0; // flash adds roughly +2 stops
+						ctx.filter = `blur(${blurAmt}px) brightness(${brightnessFactor})`;
 					// redraw original through filter
 					if(originalImageData){ ctx.putImageData(originalImageData,0,0); } else { drawOriginal(); }
 					ctx.filter = 'none';
 				} else {
 					// fallback: adjust brightness by reading pixels
 					const imgd = ctx.getImageData(0,0,canvas.width,canvas.height);
-					const d = imgd.data;
-					const bright = Math.pow(2, exposureAdj + isoStops);
+						const d = imgd.data;
+						let bright = Math.pow(2, exposureAdj + isoStops);
+						if(flash) bright *= 4.0;
 					for(let i=0;i<d.length;i+=4){ d[i] = Math.min(255, d[i]*bright); d[i+1] = Math.min(255, d[i+1]*bright); d[i+2] = Math.min(255, d[i+2]*bright); }
 					ctx.putImageData(imgd,0,0);
 				}
@@ -904,6 +1113,9 @@
 			// initialize image
 				if(img.complete){ drawOriginal(); } else { img.onload = ()=>{ drawOriginal(); }; }
 
+				// expose applyEffects for external triggers
+				window.applyEffects = applyEffects;
+
 				// wire submit to apply effects and open result modal (2D fallback)
 				document.getElementById('submitBtn').addEventListener('click', ()=>{
 					const user = {
@@ -922,6 +1134,18 @@
 				document.getElementById('resetBtn').addEventListener('click', ()=>{
 					drawOriginal();
 					const fbtn = document.getElementById('flashToggle'); if(fbtn){ fbtn.classList.remove('on'); fbtn.classList.add('off'); fbtn.setAttribute('aria-checked','false'); const s = fbtn.querySelector('span'); if(s) s.textContent = 'Off'; }
+					// clear lighting selection and canvas filters
+					const modal = document.getElementById('moreOptionsModal');
+					if(modal){
+						const btns = modal.querySelectorAll('.lighting-option');
+						btns.forEach(b=>{ b.setAttribute('aria-pressed','false'); });
+						const def = modal.querySelector('.lighting-option[data-type="none"]'); if(def) def.setAttribute('aria-pressed','true');
+						modal.style.display = 'none'; modal.setAttribute('aria-hidden','true');
+						const moreBtn = document.getElementById('moreOptionsBtn'); if(moreBtn) moreBtn.setAttribute('aria-expanded','false');
+					}
+					// clear persistent flash and update composed filter
+					window._persistentFlash = false;
+					const canvas = document.getElementById('photo-canvas'); updateCanvasFilter();
 					closeResultModal();
 				});
 
@@ -978,21 +1202,11 @@
 						<span>Camera Controls</span>
 						<div style="display:flex; align-items:center; gap:8px;">
 							<!-- More Options button: toggles the hidden panel with additional controls -->
-							<button id="moreOptionsBtn" class="btn more-options" aria-label="More Options" title="More Options" aria-expanded="false" aria-controls="moreOptionsPanel">
+							<button id="moreOptionsBtn" class="btn more-options" aria-label="More Options" title="More Options" aria-expanded="false" aria-controls="moreOptionsModal">
 								<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 8a2 2 0 100-4 2 2 0 000 4zm0 6a2 2 0 100-4 2 2 0 000 4zm0 6a2 2 0 100-4 2 2 0 000 4z" fill="currentColor"/></svg>
 							</button>
 						</div>
-						<!-- Hidden More Options panel: contains the Flash toggle moved here -->
-						<div id="moreOptionsPanel" class="more-options-panel" aria-hidden="true" style="display:none; position:absolute; right:0; top:44px; background:#fff; border:1px solid #ddd; padding:10px; border-radius:6px; box-shadow:0 6px 20px rgba(0,0,0,0.12); z-index:120; min-width:160px;">
-							<div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-								<div class="control-label" style="margin:0; font-size:12px;">Flash</div>
-								<!-- Flash toggle moved here (id preserved so existing JS still targets it) -->
-								<button id="flashToggle" class="flash-toggle" role="switch" aria-checked="false">
-									<div class="indicator" aria-hidden="true"></div>
-									<span style="margin-left:6px;">Off</span>
-								</button>
-							</div>
-						</div>
+						<!-- More options will open a modal instead of an inline panel -->
 					</div>
 					<div class="controls-inner">
 						<div class="control-group" >
