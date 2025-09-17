@@ -786,6 +786,17 @@
 						const s = flashBtn.querySelector('span'); if(s) s.textContent = isOn ? 'On' : 'Off';
 						// persistent flash state
 						window._persistentFlash = !!isOn;
+						if(isOn){
+							// clear any active lighting selection when flash is enabled
+							window._lightingType = 'none';
+							const modal = document.getElementById('moreOptionsModal');
+							if(modal){
+								const btns = modal.querySelectorAll('.lighting-option'); btns.forEach(b=>b.setAttribute('aria-pressed','false'));
+								const def = modal.querySelector('.lighting-option[data-type="none"]'); if(def) def.setAttribute('aria-pressed','true');
+							}
+							// also ensure modal flash toggle (if present) reflects state
+							const fbm = document.getElementById('flashToggleModal'); if(fbm){ fbm.classList.add('on'); fbm.classList.remove('off'); fbm.setAttribute('aria-checked','true'); const sm = fbm.querySelector('span'); if(sm) sm.textContent='On'; }
+						}
 						updateCanvasFilter();
 						// trigger render
 						scheduleApply();
@@ -850,6 +861,16 @@
 						case 'none':
 					default: src = '../assets/fingerprint.png'; break;
 					}
+					// If flash is currently enabled, disable it when applying a lighting preset
+					if(window._persistentFlash){
+						window._persistentFlash = false;
+						// update main and modal flash buttons if present
+						const fb = document.getElementById('flashToggle');
+						const fbm = document.getElementById('flashToggleModal');
+						if(fb){ fb.classList.remove('on'); fb.classList.add('off'); fb.setAttribute('aria-checked','false'); const s = fb.querySelector('span'); if(s) s.textContent = 'Off'; }
+						if(fbm){ fbm.classList.remove('on'); fbm.classList.add('off'); fbm.setAttribute('aria-checked','false'); const sm = fbm.querySelector('span'); if(sm) sm.textContent = 'Off'; }
+						updateCanvasFilter();
+					}
 					window._lightingType = type || 'none';
 					if(imgEl){
 						imgEl.src = src;
@@ -892,6 +913,11 @@
 						if(flashMainBtn){ flashMainBtn.className = flashModalBtn.className; const lm = flashMainBtn.querySelector('span'); if(lm) lm.textContent = flashModalBtn.querySelector('span').textContent; flashMainBtn.setAttribute('aria-checked', isOn ? 'true' : 'false'); }
 						// persistent flash: update flag and filters
 						window._persistentFlash = !!isOn;
+						if(isOn){
+							// clear any active lighting
+							window._lightingType = 'none';
+							if(modal){ const btns = modal.querySelectorAll('.lighting-option'); btns.forEach(b=>b.setAttribute('aria-pressed','false')); const def = modal.querySelector('.lighting-option[data-type="none"]'); if(def) def.setAttribute('aria-pressed','true'); }
+						}
 						updateCanvasFilter();
 						// trigger render
 						const ex = document.getElementById('exposure-slider'); if(ex) ex.dispatchEvent(new Event('input',{bubbles:true}));
@@ -1158,6 +1184,14 @@
 						flashBtn2.classList.toggle('off', !isOn);
 						flashBtn2.setAttribute('aria-checked', isOn ? 'true' : 'false');
 						const s = flashBtn2.querySelector('span'); if(s) s.textContent = isOn ? 'On' : 'Off';
+						// persistent flag
+						window._persistentFlash = !!isOn;
+						if(isOn){
+							// clear any active lighting selection for 2D fallback
+							window._lightingType = 'none';
+							const modal = document.getElementById('moreOptionsModal');
+							if(modal){ const btns = modal.querySelectorAll('.lighting-option'); btns.forEach(b=>b.setAttribute('aria-pressed','false')); const def = modal.querySelector('.lighting-option[data-type="none"]'); if(def) def.setAttribute('aria-pressed','true'); }
+						}
 						// reapply effects to reflect flash immediately
 						applyEffects({aperture: document.getElementById('aperture-slider').value, shutter: document.getElementById('shutter-slider').value, iso: document.getElementById('iso-slider').value, flash: isOn});
 					});
