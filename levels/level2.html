@@ -589,7 +589,7 @@
 					gl.uniform1i(gl.getUniformLocation(programs.blur,'u_tex'), 0);
 					gl.uniform2f(gl.getUniformLocation(programs.blur,'u_texel'), 1.0/canvas.width, 0.0);
 					const f = parseFloat(params.aperture || 5.6);
-					const radius = Math.max(0.1, Math.max(0.0, (8.0 / f - 1.0)) * 6.0);
+					const radius = Math.max(0.1, Math.max(0.0, (5.6 / f - 1.0)) * 6.0);
 					gl.uniform1f(gl.getUniformLocation(programs.blur,'u_radius'), radius);
 					gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
@@ -614,7 +614,7 @@
 					const isoVal = parseFloat(params.iso) || 400;
 					const isoStops = Math.log2(isoVal / 400);
 					const fAperture = parseFloat(params.aperture) || 5.6;
-					const apertureStops = 2.0 * Math.log2(8.0 / fAperture);
+					const apertureStops = 2.0 * Math.log2(5.6 / fAperture);
 					const exposureSlider = parseFloat(params.exposure || 0);
 					const totalStops = exposureAdj + isoStops + apertureStops + exposureSlider;
 					let brightness = Math.pow(2, totalStops);
@@ -714,20 +714,16 @@
 				try{ updateExposureMeterLevel2(); }catch(e){}
 
 				// Ideal forensic settings for photographing a vehicle at night (Level 2)
-				// Assumption: given Level 2 ranges (ISO 400-1600, f/4-f/8, shutter 1/10-1/30)
-				// a practical compromise for evidence capture (handheld or limited support)
-				// is to use a mid ISO with a moderate aperture and mid shutter to reduce
-				// motion blur while keeping noise reasonable. This is a conservative
-				// recommended baseline for training purposes.
-				const IDEAL_VEHICLE_NIGHT = { iso: 800, aperture: 8, shutter: 20 };
+				// Adjusted: prefer slightly wider aperture to center clarity around f/5.6
+				const IDEAL_VEHICLE_NIGHT = { iso: 800, aperture: 5.6, shutter: 20 };
 
 				function stopsForSettingsLevel2({iso, aperture, shutter, exposure}){
 					const shutterVal = parseFloat(shutter) || 20; // denominator (1/x)
 					const shutterStops = Math.log2(125 / shutterVal);
 					const isoVal = parseFloat(iso) || 800;
 					const isoStops = Math.log2(isoVal / 400); // Level 2 baseline use 400 for stops mapping
-					const f = parseFloat(aperture) || 8;
-					const apStops = 2.0 * Math.log2(8.0 / f); // baseline f/8 mapping used elsewhere
+					const f = parseFloat(aperture) || 5.6;
+					const apStops = 2.0 * Math.log2(5.6 / f); // baseline f/5.6 mapping used elsewhere
 					const exposureSlider = parseFloat(exposure || 0);
 					return { totalStops: shutterStops + isoStops + apStops + exposureSlider, shutterStops, isoStops, apStops };
 				}
@@ -935,14 +931,14 @@
 				if(originalImageData){ ctx.putImageData(originalImageData,0,0); }
 				// compute blur from aperture: map aperture (f/4-f/8) into blur radius
 				const f = parseFloat(aperture || 5.6);
-				const blurAmt = Math.max(0, Math.max(0, (8.0 / f - 1.0)) * 6.0);
+				const blurAmt = Math.max(0, Math.max(0, (5.6 / f - 1.0)) * 6.0);
 
 				// compute exposure change from shutter and aperture
 				const shutterVal = parseFloat(shutter) || 30;
 				const exposureAdj = Math.log2(125 / shutterVal);
 				const isoVal = parseFloat(iso) || 400;
 				const isoStops = Math.log2(isoVal / 400 || 1);
-				const apertureStops = 2.0 * Math.log2(8.0 / f);
+				const apertureStops = 2.0 * Math.log2(5.6 / f);
 				const exposureSlider = parseFloat(exposure || 0);
 				const totalStops = exposureAdj + isoStops + apertureStops + exposureSlider;
 
