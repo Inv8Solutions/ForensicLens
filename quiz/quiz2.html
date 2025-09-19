@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0" />
+  <title>Module 2 Quiz — Exposure Basics</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;400&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0f0f10;--card:#2b2b2f;--muted:#b3b3b7;--accent:#ff3b3f}
+    html,body{height:100vh;margin:0;padding:0;background:var(--bg);font-family:Inter,Montserrat,Arial;color:#fff;width:100vw;overflow:hidden}
+    @media only screen and (orientation: landscape){ body::before{content:'Please rotate your device to portrait';position:fixed;inset:0;background:var(--bg);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.6rem;z-index:9999} #main-content{display:none !important} }
+    .wrap{max-width:760px;margin:20px auto;padding:18px;padding-bottom:140px}
+    .top{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+    .title{font-family:Montserrat,Arial;font-size:28px;font-weight:700}
+    .subtitle{color:var(--muted)}
+    .quiz-page{overflow: scroll}
+    .progress{display:flex;gap:12px;margin-top:8px;width:100%}
+    .prog-seg{height:14px;border-radius:12px;background:#3a3a3c;flex:1;min-width:38px}
+    .prog-seg.active{background:linear-gradient(90deg,#ff6b6b,#e23b3b)}
+    .prog-seg.completed{background:linear-gradient(90deg,#ff6b6b,#e23b3b)}
+    .card{background:#232327;border-radius:16px;padding:18px;margin-top:18px;border:1px solid rgba(255,255,255,0.02)}
+    .qmeta{display:block}
+    .qbadge{width:56px;height:56px;border-radius:12px;background:linear-gradient(180deg,#ff6b6b,#e23b3b);display:inline-flex;align-items:center;justify-content:center;font-weight:700;margin-bottom:10px}
+    .qtxt{font-size:20px;font-weight:700;margin:6px 0}
+    .choices{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+    .choice{background:#2b2b2f;border-radius:12px;padding:12px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid rgba(255,255,255,0.02)}
+    .choice .letter{width:44px;height:44px;border-radius:50%;background:linear-gradient(180deg,#ff6b6b,#e23b3b);display:flex;align-items:center;justify-content:center;font-weight:700}
+    .choice.selected{outline:3px solid rgba(255,59,63,0.12)}
+    .nav{display:flex;flex-direction:column;gap:12px;position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:999;background:transparent;width:calc(100% - 40px);max-width:760px;padding:0 10px}
+    .btn{width:100%;padding:14px;border-radius:14px;border:none;background:#1c1c1d;color:#fff;font-weight:700;cursor:pointer}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);height:56px}
+    .btn.primary{background:linear-gradient(90deg,#ff6b6b,#e23b3b);height:64px}
+    .btn:disabled{opacity:0.45;cursor:default}
+    .result{margin-top:18px;background:#141417;border-radius:12px;padding:16px;color:var(--muted)}
+  </style>
+</head>
+<body class="quiz-page">
+  <div id="main-content">
+    <div class="wrap">
+    <div class="top">
+      <div class="title">Module 2 Quiz</div>
+      <div class="subtitle">Exposure Basics — Shutter, Aperture, ISO</div>
+      <div class="progress" id="progress"></div>
+    </div>
+
+    <div class="card" id="quizCard">
+      <div class="qmeta">
+        <div class="qbadge" id="qBadge">Q1</div>
+        <div style="flex:1">
+          <div class="qtxt" id="qText">Question text</div>
+          <div class="choices" id="choices"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav">
+      <button id="prevBtn" class="btn ghost">Previous</button>
+      <button id="nextBtn" class="btn primary">Next →</button>
+    </div>
+
+    <div id="result" class="result" style="display:none"></div>
+  </div>
+
+  <script>
+    const quiz = [
+      {q:'Which setting controls how long the camera sensor is exposed to light?', choices:['Aperture','ISO','Shutter Speed','White Balance'], a:2},
+      {q:'A wide aperture like f/2.8 will:', choices:['Make more of the scene sharp','Let in more light and blur the background','Reduce sensor sensitivity','Freeze motion better'], a:1},
+      {q:'Increasing ISO is like:', choices:['Making the pupil smaller','Turning up the volume on a weak radio signal','Closing the blinds','Speeding up the shutter'], a:1},
+      {q:'A slow shutter speed is useful when:', choices:['You want to freeze a fast-moving subject','Your camera is on a tripod for low-light shots','You need a very shallow depth of field','You want to lower ISO'], a:1},
+      {q:'Which group of settings together determine exposure?', choices:['Shutter speed, aperture, ISO','Shutter speed, white balance, flash','ISO, focal length, zoom','Aperture, metering, focus mode'], a:0}
+    ];
+
+    let idx = 0;
+    const answers = Array(quiz.length).fill(null);
+
+    const progressEl = document.getElementById('progress');
+    const qBadge = document.getElementById('qBadge');
+    const qText = document.getElementById('qText');
+    const choicesEl = document.getElementById('choices');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const resultEl = document.getElementById('result');
+
+    function renderProgress(){
+      progressEl.innerHTML = '';
+      for(let i=0;i<quiz.length;i++){
+        const seg = document.createElement('div');
+        if(answers[i] !== null){ seg.className = 'prog-seg completed'; }
+        else if(i === idx){ seg.className = 'prog-seg active'; }
+        else { seg.className = 'prog-seg'; }
+        progressEl.appendChild(seg);
+      }
+    }
+
+    function render(){
+      const item = quiz[idx];
+      qBadge.textContent = 'Q'+(idx+1);
+      qText.textContent = item.q;
+      choicesEl.innerHTML = '';
+      item.choices.forEach((c,i)=>{
+        const ch = document.createElement('div');
+        ch.className='choice';
+        ch.innerHTML = `<div class="letter">${String.fromCharCode(65+i)}</div><div style="flex:1">${c}</div>`;
+        ch.tabIndex = 0;
+        ch.addEventListener('click', ()=>{ select(i); });
+        ch.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); select(i); } });
+
+        function select(choiceIndex){ answers[idx]=choiceIndex; render(); }
+
+        if(answers[idx] !== null){ const selected = answers[idx]; if(i === selected){ ch.classList.add('selected'); } }
+
+        choicesEl.appendChild(ch);
+      });
+
+      prevBtn.disabled = idx===0;
+      nextBtn.textContent = idx===quiz.length-1? 'Submit':'Next →';
+      nextBtn.disabled = answers[idx] === null;
+      renderProgress();
+    }
+
+    prevBtn.addEventListener('click', ()=>{ if(idx>0){ idx--; render(); }});
+    nextBtn.addEventListener('click', ()=>{
+      if(idx<quiz.length-1){ idx++; render(); return; }
+      try{ localStorage.setItem('quiz2_answers', JSON.stringify(answers)); }catch(e){ console.warn('localStorage unavailable', e); }
+      window.location.href = 'results/quiz2-result.html';
+    });
+
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz 2 Results</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;400&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0f0f10;--card:#232326;--muted:#b3b3b7;--accent:#ff3b3f;--card-border:#b3b3b733}
+    html,body{height:100%;margin:0;background:var(--bg);font-family:Inter,Montserrat,Arial;color:#fff}
+    .wrap{max-width:520px;margin:24px auto;padding:18px;display:flex;flex-direction:column;align-items:center}
+    .medal-wrap{width:84px;height:84px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;background:linear-gradient(180deg,#ff6b6b,#e23b3b)}
+    .card{background:#2f2f33;border-radius:16px;padding:26px 20px 22px;text-align:center}
+    .title{font-size:30px;font-weight:800;margin-bottom:6px}
+    .subtitle{color:var(--muted);margin-bottom:18px}
+    .score-grid{display:flex;gap:16px;justify-content:center;margin-top:18px}
+    .score-item{background:#3a3a3f;border-radius:14px;padding:18px 16px;width:150px;box-sizing:border-box}
+    .score-big{font-size:34px;font-weight:800}
+    .actions{margin-top:18px;display:flex;flex-direction:column;gap:12px}
+    .btn{padding:12px;border-radius:12px;border:none;font-weight:700;cursor:pointer}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+    .btn.primary{background:linear-gradient(90deg,#ff6b6b,#e23b3b);color:#fff}
+    .btn:disabled{opacity:0.45;cursor:default}
+    .back{background:var(--card);border-radius:12px;border:2px solid var(--card-border);width:56px;height:56px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
+    .helper{color:var(--muted);font-size:13px;margin-top:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div style="display:flex;justify-content:flex-start;margin-bottom:18px">
+      <button class="back" onclick="history.back()" aria-label="Back">◀</button>
+    </div>
+
+    <div class="medal-wrap" aria-hidden="true">
+      <img src="../../assets/medal.png" alt="medal" style="width:56px;height:56px;display:block;object-fit:contain">
+    </div>
+
+    <div class="card">
+      <div class="title">Quiz Complete</div>
+      <div class="subtitle">Module 2: Exposure Basics</div>
+
+      <div class="score-grid" id="scoreGrid">
+        <div class="score-item"><div style="color:var(--muted);font-size:12px">Overall Score</div><div class="score-big" id="pct">0%</div></div>
+        <div class="score-item"><div style="color:var(--muted);font-size:12px">Correct Answers</div><div class="score-big" id="correctCount">0/5</div></div>
+      </div>
+      <div class="actions">
+        <button id="retake" class="btn ghost">⟲ Retake Quiz</button>
+        <button id="nextModule" class="btn primary">Next Module →</button>
+        <div id="lockHelper" class="helper" style="display:none">Get at least 4/5 correct to unlock the next module.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const answers = JSON.parse(localStorage.getItem('quiz2_answers') || '[]');
+    const quiz = [2,1,1,1,0]; // correct indices mirror quiz2-questions
+    let correct = 0;
+    for(let i=0;i<quiz.length;i++){
+      if(answers[i] === quiz[i]) correct++;
+    }
+    const pct = Math.round((correct/quiz.length)*100);
+    document.getElementById('pct').textContent = pct + '%';
+    document.getElementById('correctCount').textContent = `${correct}/${quiz.length}`;
+
+    const nextBtn = document.getElementById('nextModule');
+    const lockHelper = document.getElementById('lockHelper');
+    if(correct < 4){ nextBtn.disabled = true; lockHelper.style.display = 'block'; } else { nextBtn.disabled = false; lockHelper.style.display = 'none'; }
+
+    document.getElementById('retake').addEventListener('click', ()=>{ localStorage.removeItem('quiz2_answers'); window.location.href = '../quiz2-questions.html'; });
+    nextBtn.addEventListener('click', ()=>{ window.location.href = '../../training-modules.html'; });
+  </script>
+</body>
+</html>
