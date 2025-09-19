@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0" />
+	<title>Module 2: Parts of the Camera</title>
+	<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;400&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+	<style>
+		:root{ --bg:#18181a; --card:#232326; --muted:#b3b3b7; --accent:#ff3b3f; --card-border:#b3b3b733 }
+		html,body{height:100vh;margin:0;padding:0;background:var(--bg);font-family:Inter,Montserrat,Arial;color:#fff;width:100vw;overflow:hidden}
+
+		/* Portrait lock like levels/level1.html: prompt user to rotate device for this module */
+		@media only screen and (orientation: portrait) {
+			body::before{
+				content: 'Please rotate your device';
+				position: fixed;
+				z-index: 9999;
+				top:0;left:0;right:0;bottom:0;
+				background: var(--bg);
+				color: #fff;
+				font-size: 1.8rem;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				text-align: center;
+			}
+			#main-content { display: none !important; }
+		}
+		.container{width:100%;max-width:1120px;margin:28px auto;padding:20px;box-sizing:border-box}
+		.header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+		.back{background:var(--card);border-radius:12px;border:2px solid var(--card-border);width:56px;height:56px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
+		.title{font-family:Montserrat,Arial;font-size:20px;font-weight:700}
+		.layout{display:flex;gap:24px}
+		.main{flex:1;background:var(--card);border-radius:16px;padding:18px;border:2px solid var(--card-border);box-shadow:0 6px 18px rgba(0,0,0,0.4);display:flex;flex-direction:column;gap:12px}
+		.sidebar{width:340px;display:flex;flex-direction:column;gap:12px}
+		.image-wrap{background:#0f0f10;border-radius:12px;overflow:hidden;padding:12px;display:flex;align-items:center;justify-content:center;height:420px}
+		.image-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+
+		/* Landscape helper for module1 only */
+		/* On small portrait viewports, show a rotated full-screen viewer so the image is visible at full height */
+		.landscape-overlay{position:fixed;inset:0;display:none;background:linear-gradient(180deg,rgba(0,0,0,0.85),rgba(0,0,0,0.85));z-index:2000;align-items:center;justify-content:center;padding:12px}
+		.landscape-overlay.active{display:flex}
+		.landscape-overlay .viewer{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;overflow:hidden}
+		.landscape-overlay img{height:100%;width:auto;object-fit:contain;transform-origin:center center;}
+		.landscape-overlay .controls{position:absolute;top:14px;left:14px;display:flex;gap:8px}
+		.landscape-overlay .btn{background:var(--card);color:#fff;border:1px solid var(--card-border);padding:8px 12px;border-radius:10px;cursor:pointer}
+
+		/* Hide sidebar and make image taller on small screens (non-overlay fallback) */
+		@media (max-width:980px){
+			.sidebar{display:none}
+			.layout{flex-direction:column}
+			.image-wrap{height:calc(100vh - 110px);border-radius:0;padding:6px}
+			.image-wrap img{height:100%;width:auto;object-fit:contain}
+		}
+		.finish{margin-top:0;background:var(--accent);color:#fff;border:none;padding:14px;border-radius:12px;font-weight:700;width:100%;cursor:pointer;flex:0 0 auto}
+		.content-scroll{flex:1 1 auto;overflow:auto;padding-right:8px}
+		.content-scroll h3{margin:0 0 12px 0;font-size:16px}
+		/* Styled list: cards with circular red badges */
+		.fn-list{display:flex;flex-direction:column;gap:12px;padding:0;margin:0}
+		.fn-card{background:#141417;border-radius:14px;padding:14px;display:flex;gap:12px;align-items:flex-start;border:1px solid rgba(179,179,183,0.06)}
+		.fn-badge{width:44px;height:44px;border-radius:100px;background:linear-gradient(180deg,#ff6b6b,#e23b3b);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex:0 0 44px}
+		.fn-text{color:var(--muted);font-size:13px;line-height:1.45}
+		.fn-title{font-weight:700;color:#fff;margin:0 0 6px 0;font-size:14px}
+		.side-card{background:var(--card);border-radius:12px;padding:14px;border:2px solid var(--card-border);display:flex;flex-direction:column;gap:12px}
+		.item{display:flex;gap:12px;align-items:flex-start}
+		.badge{width:44px;height:44px;border-radius:10px;background:linear-gradient(180deg,#ff6b6b,#e23b3b);display:flex;align-items:center;justify-content:center;font-weight:700}
+		.meta h4{margin:0;font-size:14px}
+		.meta p{margin:6px 0 0 0;color:var(--muted);font-size:13px}
+		@media(max-width:980px){.layout{flex-direction:column}.sidebar{width:100%}.image-wrap{height:320px}}
+	</style>
+</head>
+	<body class="content-scroll">
+		<div id="main-content" class="container">
+		<div class="header">
+			<button class="back" onclick="history.back()" aria-label="Back">◀</button>
+			<div class="title">Module 1: Parts of the Camera</div>
+		</div>
+
+		<div class="layout">
+			<div class="main">
+				<div class="image-wrap">
+					<img id="moduleImage" src="../assets/partsOfCamera.png" alt="Parts of the camera diagram">
+				</div>
+				<div class="content-scroll" aria-label="Functions of the parts">
+					<h3>Functions of the Parts of Camera</h3>
+					<div class="fn-list">
+						<div class="fn-card"><div class="fn-badge">1</div><div><p class="fn-title">Focus Ring</p><p class="fn-text">Used to manually adjust the sharpness of the subject in the frame.</p></div></div>
+						<div class="fn-card"><div class="fn-badge">2</div><div><p class="fn-title">Zoom Lens (28–105mm)</p><p class="fn-text">Can be manually adjusted using the zoom selector / zoom mechanism / distance scale.</p></div></div>
+						<div class="fn-card"><div class="fn-badge">3</div><div><p class="fn-title">Auto or Manual Focus Switch</p><p class="fn-text">Lets you switch between autofocus (AF) and manual focus (MF).</p></div></div>
+						<div class="fn-card"><div class="fn-badge">4</div><div><p class="fn-title">Shutter Release Button</p><p class="fn-text">Triggers the camera to capture an image when pressed.</p></div></div>
+						<div class="fn-card"><div class="fn-badge">5</div><div><p class="fn-title">Front Command Dial</p><p class="fn-text">Allows quick adjustments of settings like aperture or shutter speed, depending on mode.</p></div></div>
+						<div class="fn-card"><div class="fn-badge">6</div><div><p class="fn-title">Back Command Dial</p><p class="fn-text">Works with the front dial to adjust settings such as exposure, shutter speed, or aperture.</p></div></div>
+						<div class="fn-card"><div class="fn-badge">7</div><div><p class="fn-title">Mode Selector</p><p class="fn-text">Selects the shooting mode (manual, automatic, aperture priority, shutter priority, etc.).</p></div></div>
+						<div class="fn-card"><div class="fn-badge">8</div><div><p class="fn-title">ISO Setting</p><p class="fn-text">Controls the camera’s sensitivity to light (low ISO for bright light, high ISO for low light).</p></div></div>
+						<div class="fn-card"><div class="fn-badge">9</div><div><p class="fn-title">Chosen Aperture</p><p class="fn-text">Adjusts the lens opening size, controlling depth of field and the amount of light entering.</p></div></div>
+						<div class="fn-card"><div class="fn-badge">10</div><div><p class="fn-title">Chosen Shutter Speed</p><p class="fn-text">Determines how long the shutter stays open, controlling motion blur and exposure.</p></div></div>
+						<div class="fn-card"><div class="fn-badge">11</div><div><p class="fn-title">Light Meter</p><p class="fn-text">Displays if the current settings will properly expose the photo.</p></div></div>
+						<div class="fn-card"><div class="fn-badge">12</div><div><p class="fn-title">View Finder</p><p class="fn-text">Allows the photographer to look through and compose the shot.</p></div></div>
+						<div class="fn-card"><div class="fn-badge">13</div><div><p class="fn-title">Electronic Display/Text</p><p class="fn-text">Shows shooting information such as shutter speed, aperture, ISO, and focus mode.</p></div></div>
+					</div>
+				</div>
+				<button id="finishBtn" class="finish">Finish Module →</button>
+			</div>
+			<aside class="sidebar">
+				<div class="side-card">
+					<div class="item"><div class="badge">1</div><div class="meta"><h4>Focus Ring</h4><p>Used to manually adjust the sharpness of the subject in the frame.</p></div></div>
+					<div class="item"><div class="badge">2</div><div class="meta"><h4>Zoom Lens (28–105mm)</h4><p>Can be manually adjusted using the zoom selector / zoom mechanism / distance scale.</p></div></div>
+					<div class="item"><div class="badge">3</div><div class="meta"><h4>Auto or Manual Focus Switch</h4><p>Lets you switch between autofocus (AF) and manual focus (MF).</p></div></div>
+					<div class="item"><div class="badge">4</div><div class="meta"><h4>Shutter Release Button</h4><p>Triggers the camera to capture an image when pressed.</p></div></div>
+					<div class="item"><div class="badge">5</div><div class="meta"><h4>Front Command Dial</h4><p>Allows quick adjustments of settings like aperture or shutter speed, depending on mode.</p></div></div>
+				</div>
+			</aside>
+		</div>
+	</div>
+
+	<script>
+		// navigation
+		document.getElementById('finishBtn').addEventListener('click', ()=>{ window.location.href = '../training-modules.html'; });
+		// defensive: if asset missing, show fallback text
+		const img = document.getElementById('moduleImage');
+		img.addEventListener('error', ()=>{
+			img.style.display = 'none';
+			const w = document.querySelector('.image-wrap');
+			w.innerHTML = '<div style="color:var(--muted);">Image not found: ../assets/partosofcamera.png</div>';
+		});
+
+		// --- Orientation / landscape viewer helpers ---
+		// Create overlay nodes
+		const overlay = document.createElement('div');
+		overlay.className = 'landscape-overlay';
+		overlay.innerHTML = `
+			<div class="viewer">
+				<div class="controls">
+					<button class="btn" id="rotateOpen">Open Full Height View</button>
+					<button class="btn" id="rotateClose" style="display:none">Close</button>
+				</div>
+				<img id="overlayImg" src="${img.src}" alt="Full height diagram">
+			</div>
+		`;
+		document.body.appendChild(overlay);
+
+		const overlayImg = document.getElementById('overlayImg');
+		const rotateOpen = document.getElementById('rotateOpen');
+		const rotateClose = document.getElementById('rotateClose');
+
+		function showOverlay(){
+			overlay.classList.add('active');
+			rotateOpen.style.display='none';
+			rotateClose.style.display='inline-block';
+		}
+
+		function hideOverlay(){
+			overlay.classList.remove('active');
+			rotateOpen.style.display='inline-block';
+			rotateClose.style.display='none';
+		}
+
+		rotateOpen.addEventListener('click', async ()=>{
+			// Try to lock orientation to landscape on supported browsers after a user gesture
+			if (screen.orientation && screen.orientation.lock){
+				try{ await screen.orientation.lock('landscape'); }catch(e){ /* ignore */ }
+			}
+			showOverlay();
+		});
+		rotateClose.addEventListener('click', async ()=>{
+			if (screen.orientation && screen.orientation.unlock){
+				try{ screen.orientation.unlock(); }catch(e){ /* ignore */ }
+			}
+			hideOverlay();
+		});
+
+		// Detect portrait on load and prompt small screens with the open button
+		function handleResize(){
+			const isPortrait = window.innerHeight > window.innerWidth;
+			if (isPortrait && window.innerWidth <= 980){
+				// show the open control inside the image-wrap if not already
+				const wrap = document.querySelector('.image-wrap');
+				if (!wrap.querySelector('#rotateOpen')){
+					const btn = document.createElement('button');
+					btn.className='btn'; btn.id='rotateOpen'; btn.textContent='Open Full Height View';
+					btn.style.position='absolute'; btn.style.bottom='18px'; btn.style.left='18px';
+					wrap.style.position='relative';
+					wrap.appendChild(btn);
+					btn.addEventListener('click', ()=>{ rotateOpen.click(); });
+				}
+			} else {
+				// remove any in-wrap button to avoid duplication
+				const wrap = document.querySelector('.image-wrap');
+				const inbtn = wrap.querySelector('#rotateOpen');
+				if (inbtn && inbtn !== rotateOpen) inbtn.remove();
+			}
+		}
+
+		window.addEventListener('resize', handleResize);
+		document.addEventListener('DOMContentLoaded', handleResize);
+	</script>
+</body>
+</html>
