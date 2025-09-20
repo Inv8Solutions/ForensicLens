@@ -7,7 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;400&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         :root{ --bg:#18181a; --card:#232326; --muted:#b3b3b7; --accent:#ff3b3f; --card-border:#b3b3b733 }
-        html,body{height:100vh;margin:0;padding:0;background:var(--bg);font-family:Inter,Montserrat,Arial;color:#fff;width:100vw;overflow:hidden}
+        html,body{height:100vh;margin:0;padding:0;background:var(--bg);font-family:Inter,Montserrat,Arial;color:#fff;width:100vw;overflow:auto}
 
         /* Landscape lock -> prompt user to rotate device to portrait for this module */
         @media only screen and (orientation: landscape) {
@@ -31,10 +31,14 @@
         .back{background:var(--card);border-radius:12px;border:2px solid var(--card-border);width:56px;height:56px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
         .title{font-family:Montserrat,Arial;font-size:20px;font-weight:700}
         .layout{display:flex;gap:24px}
-        .main{flex:1;background:var(--card);border-radius:16px;padding:18px;border:2px solid var(--card-border);box-shadow:0 6px 18px rgba(0,0,0,0.4);display:flex;flex-direction:column;gap:12px}
+        .main{flex:1;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px}
         .sidebar{width:340px;display:flex;flex-direction:column;gap:12px}
-        .image-wrap{background:#0f0f10;border-radius:12px;overflow:hidden;padding:12px;display:flex;align-items:center;justify-content:center;height:420px}
-        .image-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+    .image-wrap{background:#0f0f10;border-radius:12px;overflow:hidden;padding:12px;display:flex;align-items:center;justify-content:center;height:420px;position:relative}
+    .image-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+    /* progress overlay that sits on top of the image */
+    .progress-overlay{display: flex; justify-content:space-between;}
+    .progress{display:flex;gap:8px}
+    .prog-pill{flex:1;height:10px;border-radius:10px;background:#3a3a3c}
 
         /* Portrait helper overlay: on small landscape viewports, show a portrait-oriented full-screen viewer */
         .landscape-overlay{position:fixed;inset:0;display:none;background:linear-gradient(180deg,rgba(0,0,0,0.85),rgba(0,0,0,0.85));z-index:2000;align-items:center;justify-content:center;padding:12px}
@@ -52,7 +56,7 @@
             .image-wrap img{height:100%;width:auto;object-fit:contain}
         }
         .finish{margin-top:0;background:var(--accent);color:#fff;border:none;padding:14px;border-radius:12px;font-weight:700;width:100%;cursor:pointer;flex:0 0 auto}
-        .content-scroll{flex:1 1 auto;overflow:auto;padding-right:8px}
+        .content-scroll{flex:1 1 auto;overflow:auto;padding-right:8px;}
         .content-scroll h3{margin:0 0 12px 0;font-size:16px}
         /* Styled list: cards with circular red badges */
         .fn-list{display:flex;flex-direction:column;gap:12px;padding:0;margin:0}
@@ -68,7 +72,7 @@
         @media(max-width:980px){.layout{flex-direction:column}.sidebar{width:100%}.image-wrap{height:320px}}
     </style>
 </head>
-    <body class="content-scroll">
+    <body>
         <div id="main-content" class="container">
         <div class="header">
             <button class="back" onclick="history.back()" aria-label="Back">◀</button>
@@ -77,28 +81,51 @@
 
         <div class="layout">
             <div class="main">
+                <div class="progress-overlay">
+                    <p>Content Progress</p>
+                    <p>1/4</p>
+                </div>
+                <!-- pill progress bar (matches Module 1 placement) -->
+                    <div style="display:flex;justify-content:center;margin:10px 0 18px">
+                        <div class="progress" style="display:flex;gap:8px;max-width:520px;width:100%">
+                            <div class="prog-pill" id="seg1" style="flex:1;height:10px;border-radius:10px;background:linear-gradient(90deg,#ff6b6b,#e23b3b)"></div>
+                            <div class="prog-pill" id="seg2" style="flex:1;height:10px;border-radius:10px;background:#3a3a3c"></div>
+                            <div class="prog-pill" id="seg3" style="flex:1;height:10px;border-radius:10px;background:#3a3a3c"></div>
+                            <div class="prog-pill" id="seg4" style="flex:1;height:10px;border-radius:10px;background:#3a3a3c"></div>
+                        </div>
+                    </div>
                 <div class="image-wrap">
                     <img id="moduleImage" src="../assets/module2.png" alt="Parts of the camera diagram">
                 </div>
-                <div class="content-scroll" aria-label="Functions of the parts">
-                    <h3>Functions of the Parts of Camera</h3>
-                    <div class="fn-list">
-                        <div class="fn-card"><div class="fn-badge">1</div><div><p class="fn-title">Focus Ring</p><p class="fn-text">Used to manually adjust the sharpness of the subject in the frame.</p></div></div>
-                        <div class="fn-card"><div class="fn-badge">2</div><div><p class="fn-title">Zoom Lens (28–105mm)</p><p class="fn-text">Can be manually adjusted using the zoom selector / zoom mechanism / distance scale.</p></div></div>
-                        <div class="fn-card"><div class="fn-badge">3</div><div><p class="fn-title">Auto or Manual Focus Switch</p><p class="fn-text">Lets you switch between autofocus (AF) and manual focus (MF).</p></div></div>
-                        <div class="fn-card"><div class="fn-badge">4</div><div><p class="fn-title">Shutter Release Button</p><p class="fn-text">Triggers the camera to capture an image when pressed.</p></div></div>
-                        <div class="fn-card"><div class="fn-badge">5</div><div><p class="fn-title">Front Command Dial</p><p class="fn-text">Allows quick adjustments of settings like aperture or shutter speed, depending on mode.</p></div></div>
-                        <div class="fn-card"><div class="fn-badge">6</div><div><p class="fn-title">Back Command Dial</p><p class="fn-text">Works with the front dial to adjust settings such as exposure, shutter speed, or aperture.</p></div></div>
-                        <div class="fn-card"><div class="fn-badge">7</div><div><p class="fn-title">Mode Selector</p><p class="fn-text">Selects the shooting mode (manual, automatic, aperture priority, shutter priority, etc.).</p></div></div>
-                        <div class="fn-card"><div class="fn-badge">8</div><div><p class="fn-title">ISO Setting</p><p class="fn-text">Controls the camera’s sensitivity to light (low ISO for bright light, high ISO for low light).</p></div></div>
-                        <div class="fn-card"><div class="fn-badge">9</div><div><p class="fn-title">Chosen Aperture</p><p class="fn-text">Adjusts the lens opening size, controlling depth of field and the amount of light entering.</p></div></div>
-                        <div class="fn-card"><div class="fn-badge">10</div><div><p class="fn-title">Chosen Shutter Speed</p><p class="fn-text">Determines how long the shutter stays open, controlling motion blur and exposure.</p></div></div>
-                        <div class="fn-card"><div class="fn-badge">11</div><div><p class="fn-title">Light Meter</p><p class="fn-text">Displays if the current settings will properly expose the photo.</p></div></div>
-                        <div class="fn-card"><div class="fn-badge">12</div><div><p class="fn-title">View Finder</p><p class="fn-text">Allows the photographer to look through and compose the shot.</p></div></div>
-                        <div class="fn-card"><div class="fn-badge">13</div><div><p class="fn-title">Electronic Display/Text</p><p class="fn-text">Shows shooting information such as shutter speed, aperture, ISO, and focus mode.</p></div></div>
+                <!-- Content -->
+                <div class="content-scroll" aria-label="Shutter speed explanation">
+                    <div class="side-card" style="padding:18px;background-color: #3A3A40;">
+                        <h3 style="margin-top:0;color:#fff;font-size: 16px;">Shutter Speed</h3>
+                        <p style="margin:8px 0 12px;color:var(--muted);font-size:14px;line-height:1.45">
+                            How long the camera’s shutter stays open to let light in. Fast shutter speeds freeze action, while slow speeds create motion blur.
+                        </p>
+
+                        <div style="background:#2a2a2d;border-radius:12px;padding:14px;display:flex;gap:12px;align-items:flex-start">
+                            <div style="flex:0 0 36px;font-size:20px;display:flex;align-items:flex-start;justify-content:center">💡</div>
+                            <div>
+                                <p style="margin:0 0 8px 0;color:#fff;font-weight:700">Think of it like:</p>
+                                <p style="margin:0;color:var(--muted);font-size:13px;line-height:1.45">
+                                    It's like how long you keep your eyes open when looking at something moving. Blink fast = freeze the moment. Keep them open longer = blur from movement.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="side-card" style="padding:18px;background-color: #3A3A40;margin-top: 10px;">
+                        <h3 style="margin-top:0;color:#fff;">Example</h3>
+                        <ul style="margin:8px 0 0 18px;font-size:14px;line-height:1.5">
+                            <li>Fast (1/1000s) = Freeze a running athlete mid-stride</li>
+                            <li>Medium (1/60s) = Normal handheld photos</li>
+                            <li>Slow (1s) = Smooth waterfalls, light trails from cars</li>
+                        </ul>
                     </div>
                 </div>
-                <button id="finishBtn" class="finish">Finish Module →</button>
+                <button id="finishBtn" class="finish">Next →</button>
             </div>
             <aside class="sidebar">
                 <div class="side-card">
@@ -113,8 +140,161 @@
     </div>
 
     <script>
-        // navigation
-    document.getElementById('finishBtn').addEventListener('click', ()=>{ window.location.href = '../quiz/quiz1.html'; });
+        // Two-step navigation: first click -> load next card (Aperture). Second click -> go to quiz.
+    (function(){
+        const btn = document.getElementById('finishBtn');
+    let step = 1; // currently showing first card
+    // select the content-scroll specifically inside the page main container
+    const content = document.querySelector('#main-content .content-scroll');
+        // keep the original children so we don't destructively remove them
+        const originalChildren = Array.from(content.children);
+
+        function loadApertureCard(){
+            // Hide existing children instead of removing them (safer)
+            originalChildren.forEach(ch => { ch.style.display = 'none'; });
+
+            // Create a container for the Aperture card so we don't clobber other elements
+            const apertureEl = document.createElement('div');
+            apertureEl.className = 'aperture-step';
+            apertureEl.innerHTML = `
+                <div class="side-card" style="padding:18px;background-color: #3A3A40;">
+                    <h3 style="margin-top:0;color:#fff;font-size: 16px;">Aperture</h3>
+                    <p style="margin:8px 0 12px;color:var(--muted);font-size:14px;line-height:1.45">
+                        The size of the opening in the lens that lets light through. Wide apertures create blurry backgrounds, narrow apertures keep everything sharp.
+                    </p>
+
+                    <div style="background:#2a2a2d;border-radius:12px;padding:14px;display:flex;gap:12px;align-items:flex-start">
+                        <div style="flex:0 0 36px;font-size:20px;display:flex;align-items:flex-start;justify-content:center">💡</div>
+                        <div>
+                            <p style="margin:0 0 8px 0;color:#fff;font-weight:700">Think of it like:</p>
+                            <p style="margin:0;color:var(--muted);font-size:13px;line-height:1.45">Like the pupil in your eye. When it’s wide open (low f-number like f/1.4), you focus on one thing and the background blurs. When it’s narrow (high f-number like f/8), everything stays in focus.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="side-card" style="padding:18px;background-color: #3A3A40;margin-top: 10px;">
+                    <h3 style="margin-top:0;color:#fff;">Example</h3>
+                    <ul style="margin:8px 0 0 18px;font-size:14px;line-height:1.5">
+                        <li>Wide (f/1.4) = Portrait with creamy blurred background</li>
+                        <li>Medium (f/4) = Group photos with some background blur</li>
+                        <li>Narrow (f/11) = Landscape with everything sharp</li>
+                    </ul>
+                </div>
+            `;
+
+            // mark completed up to seg2
+            markCompletedSegments(2);
+
+            // update header progress text if present
+            const overlayPs = document.querySelectorAll('.progress-overlay p');
+            if (overlayPs && overlayPs.length >= 2) overlayPs[1].textContent = '2/4';
+
+            // insert the aperture element at the top of content
+            content.insertBefore(apertureEl, content.firstChild);
+            btn.textContent = 'Next →';
+        }
+
+        function loadISOCard(){
+            // Hide any previously inserted step cards (aperture-step)
+            const inserted = content.querySelectorAll('.aperture-step, .iso-step');
+            inserted.forEach(el => el.style.display = 'none');
+
+            // Create ISO card
+            const isoEl = document.createElement('div');
+            isoEl.className = 'iso-step';
+            isoEl.innerHTML = `
+                <div class="side-card" style="padding:18px;background-color: #3A3A40;">
+                    <h3 style="margin-top:0;color:#fff;font-size: 16px;">ISO</h3>
+                    <p style="margin:8px 0 12px;color:var(--muted);font-size:14px;line-height:1.45">
+                        How sensitive the camera sensor is to light. Low ISO gives clean images in bright light, high ISO lets you shoot in dark conditions but adds grain.
+                    </p>
+
+                    <div style="background:#2a2a2d;border-radius:12px;padding:14px;display:flex;gap:12px;align-items:flex-start">
+                        <div style="flex:0 0 36px;font-size:20px;display:flex;align-items:flex-start;justify-content:center">💡</div>
+                        <div>
+                            <p style="margin:0 0 8px 0;color:#fff;font-weight:700">Think of it like:</p>
+                            <p style="margin:0;color:var(--muted);font-size:13px;line-height:1.45">Like turning up the volume on a radio. Low ISO is like low volume in a quiet room - clean and clear. High ISO is like cranking the volume - your hear everything but also static/noise.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="side-card" style="padding:18px;background-color: #3A3A40;margin-top: 10px;">
+                    <h3 style="margin-top:0;color:#fff;">Example</h3>
+                    <ul style="margin:8px 0 0 18px;font-size:14px;line-height:1.5">
+                        <li>Low (ISO 100) = Bright sunny day, clean image</li>
+                        <li>Medium (ISO 800) = Indoor or evening shots</li>
+                        <li>High (ISO 3200+) = Dark concerts, night scenes with grain</li>
+                    </ul>
+                </div>
+            `;
+
+            // mark completed up to seg3
+            markCompletedSegments(3);
+
+            // update header progress text if present
+            const overlayPs = document.querySelectorAll('.progress-overlay p');
+            if (overlayPs && overlayPs.length >= 2) overlayPs[1].textContent = '3/4';
+
+            content.insertBefore(isoEl, content.firstChild);
+            btn.textContent = 'Next →';
+        }
+
+        // helper: mark completed segments up to n (1-based)
+        function markCompletedSegments(n){
+            for (let i=1;i<=4;i++){
+                const seg = document.getElementById('seg'+i);
+                if (!seg) continue;
+                if (i <= n) seg.style.background = 'linear-gradient(90deg,#ff6b6b,#e23b3b)';
+                else seg.style.background = '#3a3a3c';
+            }
+        }
+
+        function loadWindowAnalogyCard(){
+            // hide prior inserted cards
+            const inserted = content.querySelectorAll('.aperture-step, .iso-step, .window-step');
+            inserted.forEach(el => el.style.display = 'none');
+
+            const winEl = document.createElement('div');
+            winEl.className = 'window-step';
+            winEl.innerHTML = `
+                <div class="side-card" style="padding:18px;background-color: #3A3A40;">
+                    <h3 style="margin-top:0;color:#fff;font-size: 16px;">The Window Analogy</h3>
+                    <p style="margin:8px 0 12px;color:var(--muted);font-size:14px;line-height:1.45">Your camera is like a window</p>
+                    <div style="display:flex;flex-direction:column;gap:10px">
+                        <div style="background:#2a2a2d;border-radius:8px;padding:12px;color:var(--muted)"><strong>Aperture = Window Size</strong><div style="margin-top:6px">A big window lets in more light, a small window lets in less. Just like your camera's aperture opening.</div></div>
+                        <div style="background:#2a2a2d;border-radius:8px;padding:12px;color:var(--muted)"><strong>Shutter = How Long Blinds Stay Open</strong><div style="margin-top:6px">Open the blinds for a split second or leave them open longer to control how much light comes in.</div></div>
+                        <div style="background:#2a2a2d;border-radius:8px;padding:12px;color:var(--muted)"><strong>ISO = Your Eyes' Sensitivity</strong><div style="margin-top:6px">In bright light, your eyes don't need to work hard. In darkness, they become more sensitive but you see more grain.</div></div>
+                        <div style="background:#2a2a2d;border-radius:8px;padding:12px;color:var(--muted)"><strong>💡 The Key Insight</strong><div style="margin-top:6px">All three work together! If you change one setting, you need to adjust the others to keep the same amount of light (exposure) in your photo.</div></div>
+                    </div>
+                </div>
+            `;
+
+            // mark seg4 active and mark prior ones completed
+            markCompletedSegments(4);
+
+            const overlayPs = document.querySelectorAll('.progress-overlay p');
+            if (overlayPs && overlayPs.length >= 2) overlayPs[1].textContent = '4/4';
+
+            content.insertBefore(winEl, content.firstChild);
+            btn.textContent = 'Take the Quiz →';
+        }
+
+        btn.addEventListener('click', ()=>{
+            if (step === 1){
+                loadApertureCard();
+                step = 2;
+            } else if (step === 2) {
+                loadISOCard();
+                step = 3;
+            } else if (step === 3) {
+                loadWindowAnalogyCard();
+                step = 4;
+            } else {
+                // final click: navigate to quiz
+                window.location.href = '../quiz/quiz1.html';
+            }
+        });
+    })();
         // defensive: if asset missing, show fallback text
         const img = document.getElementById('moduleImage');
         img.addEventListener('error', ()=>{
