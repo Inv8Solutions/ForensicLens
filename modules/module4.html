@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lighting Effects Simulation (Fake Demo)</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f4f4f4;
+    margin: 0;
+    padding: 0;
+  }
+  h1 {
+    text-align: center;
+    padding: 20px;
+  }
+  .module {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    margin: 30px auto;
+    padding: 20px;
+    width: 80%;
+    max-width: 800px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  }
+  canvas {
+    border: 1px solid #aaa;
+    border-radius: 8px;
+    margin: 15px 0;
+    cursor: pointer;
+  }
+  .desc {
+    max-width: 700px;
+    text-align: center;
+    font-size: 0.95em;
+    color: #444;
+  }
+</style>
+</head>
+<body>
+<h1>Lighting Effects Simulation (Fake Demo)</h1>
+
+<div class="module">
+  <h2>1. Oblique Lighting</h2>
+  <canvas id="oblique" width="400" height="200"></canvas>
+  <p class="desc">Oblique lighting highlights texture by casting long shadows from the side. Drag your mouse over the canvas to "move the light".</p>
+</div>
+
+<div class="module">
+  <h2>2. Diffused Lighting</h2>
+  <canvas id="diffused" width="400" height="200"></canvas>
+  <p class="desc">Diffused lighting spreads evenly, reducing shadows and flattening texture. Hover to see the effect soften.</p>
+</div>
+
+<div class="module">
+  <h2>3. Transmitted Lighting</h2>
+  <canvas id="transmitted" width="400" height="200"></canvas>
+  <p class="desc">Transmitted lighting passes through the object, emphasizing translucency (like a leaf). Click to toggle glow effect.</p>
+</div>
+
+<script>
+/* 1. Oblique Lighting (fake shadows moving with mouse) */
+const oblique = document.getElementById("oblique");
+const ctx1 = oblique.getContext("2d");
+
+function drawOblique(x=50,y=50) {
+  ctx1.clearRect(0,0,oblique.width,oblique.height);
+  // Base object (fingerprint-like ellipse)
+  ctx1.fillStyle = "#999";
+  ctx1.beginPath();
+  ctx1.ellipse(200,100,80,50,0,0,Math.PI*2);
+  ctx1.fill();
+
+  // Fake shadow that moves
+  ctx1.fillStyle = "rgba(0,0,0,0.3)";
+  ctx1.beginPath();
+  ctx1.ellipse(200+(x-200)/6,100+(y-100)/6,80,50,0,0,Math.PI*2);
+  ctx1.fill();
+}
+drawOblique();
+
+oblique.addEventListener("mousemove", e => {
+  const rect = oblique.getBoundingClientRect();
+  drawOblique(e.clientX-rect.left,e.clientY-rect.top);
+});
+
+/* 2. Diffused Lighting (soft blur effect) */
+const diffused = document.getElementById("diffused");
+const ctx2 = diffused.getContext("2d");
+
+function drawDiffused(soft=false) {
+  ctx2.clearRect(0,0,diffused.width,diffused.height);
+  let gradient = ctx2.createRadialGradient(200,100,soft?150:60,200,100,200);
+  gradient.addColorStop(0, soft ? "#bbb" : "#999");
+  gradient.addColorStop(1, "#eee");
+  ctx2.fillStyle = gradient;
+  ctx2.beginPath();
+  ctx2.arc(200,100,70,0,Math.PI*2);
+  ctx2.fill();
+}
+drawDiffused();
+
+diffused.addEventListener("mouseenter", ()=>drawDiffused(true));
+diffused.addEventListener("mouseleave", ()=>drawDiffused(false));
+
+/* 3. Transmitted Lighting (fake glow toggle) */
+const transmitted = document.getElementById("transmitted");
+const ctx3 = transmitted.getContext("2d");
+let glow = false;
+
+function drawTransmitted() {
+  ctx3.clearRect(0,0,transmitted.width,transmitted.height);
+  ctx3.fillStyle = glow ? "rgba(0,200,0,0.6)" : "#2a5";
+  ctx3.beginPath();
+  ctx3.moveTo(200,50);
+  ctx3.lineTo(250,100);
+  ctx3.lineTo(200,150);
+  ctx3.lineTo(150,100);
+  ctx3.closePath();
+  ctx3.fill();
+
+  if (glow) {
+    ctx3.shadowColor = "rgba(0,255,0,0.6)";
+    ctx3.shadowBlur = 30;
+    ctx3.fill();
+    ctx3.shadowBlur = 0;
+  }
+}
+drawTransmitted();
+
+transmitted.addEventListener("click", ()=>{
+  glow = !glow;
+  drawTransmitted();
+});
+</script>
+</body>
+</html>

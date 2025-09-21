@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="800" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="backGlow" cx="50%" cy="70%" r="60%">
+      <stop offset="0%" stop-color="#fff7cc" stop-opacity="0.95"/>
+      <stop offset="40%" stop-color="#ffd27f" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#ff9a3d" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="#0b0b0d" />
+
+  <!-- transmitted example: a semi-transparent leaf-like shape with glow behind -->
+  <g>
+    <ellipse cx="600" cy="420" rx="260" ry="160" fill="url(#backGlow)" opacity="0.95" />
+    <path d="M420 360 C520 180 680 180 780 360 C700 420 520 460 420 360" fill="#c4e7b9" opacity="0.7"/>
+    <path d="M520 280 C560 260 640 260 680 280 C660 320 540 320 520 280" fill="#ffffff" opacity="0.18"/>
+    <!-- thin veins to suggest translucency -->
+    <g stroke="#7aa46b" stroke-width="3" opacity="0.5" fill="none">
+      <path d="M600 300 L600 460" />
+      <path d="M620 310 L540 420" />
+      <path d="M580 310 L660 420" />
+    </g>
+  </g>
+
+  <text x="60" y="80" fill="#e6e6e6" font-family="Montserrat,Arial" font-size="32">Transmitted lighting — backlit/translucent effect revealing internal structure</text>
+</svg>

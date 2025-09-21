@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0" />
+    <title>Module 3: Lighting Techniques</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;400&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root{ --bg:#18181a; --card:#232326; --muted:#b3b3b7; --accent:#ff3b3f; --card-border:#b3b3b733 }
+        html,body{height:100vh;margin:0;padding:0;background:var(--bg);font-family:Inter,Montserrat,Arial;color:#fff;width:100vw;overflow:auto}
+
+        .container{width:100%;max-width:1120px;margin:28px auto;padding:20px;box-sizing:border-box}
+        .header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+        .back{background:var(--card);border-radius:12px;border:2px solid var(--card-border);width:56px;height:56px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
+        .title{font-family:Montserrat,Arial;font-size:20px;font-weight:700}
+        .layout{display:flex;gap:24px}
+        .main{flex:1;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px}
+        .sidebar{width:340px;display:flex;flex-direction:column;gap:12px}
+        .image-wrap{background:#0f0f10;border-radius:12px;overflow:hidden;padding:12px;display:flex;align-items:center;justify-content:center;height:420px;position:relative}
+        .image-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+
+        .controls{display:flex;gap:8px;flex-wrap:wrap}
+        .ctrl{background:var(--card);border-radius:10px;padding:10px;border:2px solid var(--card-border);color:var(--muted);font-size:14px}
+        .panel-list{display:flex;gap:10px}
+        .panel-btn{background:#141417;border-radius:10px;padding:10px 12px;border:1px solid rgba(179,179,183,0.06);cursor:pointer;color:var(--muted);font-weight:700}
+        .panel-btn.active{background:linear-gradient(90deg,#ff6b6b,#e23b3b);color:#fff}
+
+        .simulator{display:grid;grid-template-columns:1fr 340px;gap:18px}
+        .sim-main{background:#0f0f10;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;min-height:360px;position:relative}
+        .sim-sidebar{display:flex;flex-direction:column;gap:12px}
+        .side-card{background:var(--card);border-radius:12px;padding:14px;border:2px solid var(--card-border);display:flex;flex-direction:column;gap:12px}
+
+        /* overlay layers used to simulate lighting */
+        .scene{position:relative;width:100%;height:100%;border-radius:8px;overflow:hidden;background:#0b0b0c;display:flex;align-items:center;justify-content:center}
+        .scene img{width:70%;height:auto;object-fit:contain;filter:grayscale(0%);}
+
+        .overlay-shadows{position:absolute;inset:0;pointer-events:none}
+        .oblique-light{position:absolute;inset:0;background:linear-gradient(120deg, rgba(255,255,255,0.06), rgba(255,255,255,0));mix-blend-mode:screen;opacity:0;transition:all 220ms ease}
+        .oblique-shadow{position:absolute;inset:0;background:linear-gradient(120deg, rgba(0,0,0,0.6), rgba(0,0,0,0));mix-blend-mode:multiply;opacity:0;transition:all 220ms ease;}
+        .diffuse-layer{position:absolute;inset:0;background:radial-gradient(circle at 50% 40%, rgba(255,255,255,0.06), rgba(255,255,255,0.02) 20%, rgba(0,0,0,0.06) 100%);opacity:0;mix-blend-mode:screen;transition:all 220ms}
+        .transmitted{position:absolute;inset:0;background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0));opacity:0;mix-blend-mode:screen;transition:all 220ms}
+
+        /* small helper visual for oblique direction */
+        .dir-arrow{position:absolute;right:14px;top:14px;background:rgba(0,0,0,0.4);padding:6px;border-radius:8px;font-size:13px}
+
+    /* Portrait helper overlay (matches module2 pattern) */
+    .landscape-overlay{position:fixed;inset:0;display:none;background:linear-gradient(180deg,rgba(0,0,0,0.85),rgba(0,0,0,0.85));z-index:2000;align-items:center;justify-content:center;padding:12px}
+    .landscape-overlay.active{display:flex}
+    .landscape-overlay .viewer{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;overflow:hidden}
+    .landscape-overlay img{height:100%;width:auto;object-fit:contain;transform-origin:center center;}
+    .landscape-overlay .controls{position:absolute;top:14px;left:14px;display:flex;gap:8px}
+    .landscape-overlay .btn{background:var(--card);color:#fff;border:1px solid var(--card-border);padding:8px 12px;border-radius:10px;cursor:pointer}
+
+        /* responsive */
+        @media (max-width:980px){
+            .sidebar{display:none}
+            .layout{flex-direction:column}
+            .simulator{grid-template-columns:1fr;}
+            .image-wrap{height:calc(100vh - 140px);border-radius:0;padding:6px}
+        }
+
+        .finish{margin-top:0;background:var(--accent);color:#fff;border:none;padding:14px;border-radius:12px;font-weight:700;width:100%;cursor:pointer;flex:0 0 auto}
+
+        /* small form inputs */
+        input[type=range]{width:100%}
+        label{font-size:13px;color:var(--muted)}
+
+    </style>
+</head>
+<body>
+    <div class="container" id="main-content">
+        <div class="header">
+            <button class="back" onclick="history.back()" aria-label="Back">◀</button>
+            <div class="title">Module 3: Lighting Techniques</div>
+        </div>
+
+        <div class="layout">
+            <div class="main">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div style="display:flex;gap:12px;align-items:center">
+                        <div class="panel-list" role="tablist" aria-label="Lighting types">
+                            <button class="panel-btn active" data-panel="oblique">Oblique</button>
+                            <button class="panel-btn" data-panel="diffuse">Diffused</button>
+                            <button class="panel-btn" data-panel="transmitted">Transmitted</button>
+                        </div>
+                        <div style="margin-left:12px;display:flex;gap:8px;align-items:center">
+                            <button class="ctrl" id="presetOb">Show Oblique</button>
+                            <button class="ctrl" id="presetDiff">Show Diffuse</button>
+                            <button class="ctrl" id="presetTrans">Show Transmitted</button>
+                        </div>
+                    </div>
+                    <div style="color:var(--muted);font-size:13px">Interactive simulator — adjust controls to see effect</div>
+                </div>
+
+                <div class="simulator">
+                    <div class="sim-main">
+                        <div class="scene" id="scene">
+                              <!-- Inline SVGs to avoid external file loading issues (file:// CORS or path problems) -->
+                                                            <div id="svgOblique" class="inline-svg" style="width:100%;height:100%">
+                                                                    <!-- Layered Oblique SVG: base surface, object, hard shadow, soft penumbra, specular, texture/grain -->
+                                                                    <svg width="100%" height="100%" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" aria-hidden="false" role="img">
+                                                                        <defs>
+                                                                            <!-- directional highlight gradient -->
+                                                                            <linearGradient id="ob_highlight" x1="0" y1="0" x2="1" y2="0">
+                                                                                <stop offset="0%" stop-color="#fff" stop-opacity="0.95" />
+                                                                                <stop offset="30%" stop-color="#fff" stop-opacity="0.45" />
+                                                                                <stop offset="100%" stop-color="#fff" stop-opacity="0" />
+                                                                            </linearGradient>
+
+                                                                            <!-- thin hard shadow (sharp) -->
+                                                                            <filter id="hardShadow" x="-50%" y="-50%" width="200%" height="200%" filterUnits="objectBoundingBox">
+                                                                                <feDropShadow dx="48" dy="34" stdDeviation="6" flood-color="#000" flood-opacity="0.7" />
+                                                                            </filter>
+
+                                                                            <!-- wide soft penumbra -->
+                                                                            <radialGradient id="penumbra" cx="0.75" cy="0.8" r="0.7">
+                                                                                <stop offset="0%" stop-color="#000" stop-opacity="0.45" />
+                                                                                <stop offset="60%" stop-color="#000" stop-opacity="0.18" />
+                                                                                <stop offset="100%" stop-color="#000" stop-opacity="0" />
+                                                                            </radialGradient>
+
+                                                                            <!-- subtle surface grain pattern -->
+                                                                            <pattern id="grain" width="6" height="6" patternUnits="userSpaceOnUse">
+                                                                                <rect width="6" height="6" fill="rgba(0,0,0,0)" />
+                                                                                <circle cx="1" cy="1" r="0.6" fill="rgba(0,0,0,0.02)" />
+                                                                            </pattern>
+
+                                                                            <!-- tiny specular glint -->
+                                                                            <radialGradient id="glint" cx="30%" cy="20%" r="30%">
+                                                                                <stop offset="0%" stop-color="#fff" stop-opacity="0.95" />
+                                                                                <stop offset="50%" stop-color="#fff" stop-opacity="0.45" />
+                                                                                <stop offset="100%" stop-color="#fff" stop-opacity="0" />
+                                                                            </radialGradient>
+                                                                        </defs>
+
+                                                                        <!-- dark backdrop / table surface -->
+                                                                        <rect width="100%" height="100%" fill="#0b0b0d" />
+
+                                                                        <!-- ground plane subtle gradient for depth -->
+                                                                        <rect x="60" y="460" width="1080" height="260" rx="14" fill="url(#penumbra)" opacity="0.35" />
+
+                                                                        <!-- object group (slightly off-center to left) -->
+                                                                        <g id="obj" transform="translate(320,160)">
+                                                                            <!-- base object silhouette with subtle bevel -->
+                                                                            <ellipse cx="260" cy="170" rx="140" ry="98" fill="#d7d7d7" />
+
+                                                                            <!-- surface texture overlay (multiply subtle) -->
+                                                                            <ellipse cx="260" cy="170" rx="140" ry="98" fill="url(#grain)" opacity="0.35" />
+
+                                                                            <!-- sharp contact shadow (hard edge) applied via filter for directional light -->
+                                                                            <ellipse cx="420" cy="360" rx="210" ry="56" fill="#000" opacity="0.62" transform="skewX(-18)" filter="url(#hardShadow)" />
+
+                                                                            <!-- soft penumbra behind hard shadow -->
+                                                                            <ellipse cx="420" cy="360" rx="260" ry="86" fill="url(#penumbra)" opacity="0.42" transform="skewX(-18)" />
+
+                                                                            <!-- oblique highlight: elongated, rotated gradient to simulate grazing light -->
+                                                                            <ellipse cx="195" cy="100" rx="90" ry="36" fill="url(#ob_highlight)" transform="rotate(-28 195 100)" opacity="0.95" />
+
+                                                                            <!-- specular glint: small bright spot where surface faces light -->
+                                                                            <ellipse cx="170" cy="82" rx="12" ry="6" fill="url(#glint)" opacity="0.95" />
+
+                                                                            <!-- faint scratches / texture strokes to accentuate relief -->
+                                                                            <g stroke="#000" stroke-opacity="0.06" stroke-width="2" fill="none">
+                                                                                <path d="M160 80 q40 26 90 18" />
+                                                                                <path d="M150 120 q60 22 110 26" />
+                                                                                <path d="M170 150 q50 18 95 12" />
+                                                                            </g>
+                                                                        </g>
+
+                                                                        <!-- label -->
+                                                                        <text x="60" y="80" fill="#e6e6e6" font-family="Montserrat,Arial" font-size="28">Oblique lighting — directional grazing light producing strong texture &amp; shadow</text>
+                                                                    </svg>
+                                                            </div>
+
+                              <div id="svgDiffuse" class="inline-svg" style="width:100%;height:100%;display:none">
+                                  <!-- Diffuse SVG -->
+                                  <?xml version="1.0" encoding="UTF-8"?>
+                                  <svg width="100%" height="100%" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+                                      <defs>
+                                          <radialGradient id="softInline" cx="50%" cy="40%" r="50%">
+                                              <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+                                              <stop offset="50%" stop-color="#ffffff" stop-opacity="0.35"/>
+                                              <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+                                          </radialGradient>
+                                      </defs>
+                                      <rect width="100%" height="100%" fill="#0b0b0d" />
+                                      <g transform="translate(200,200)">
+                                          <rect x="160" y="80" width="480" height="320" rx="22" fill="#dcdcdc" />
+                                          <rect x="160" y="80" width="480" height="320" rx="22" fill="url(#softInline)" opacity="0.95" />
+                                          <ellipse cx="400" cy="430" rx="200" ry="40" fill="#000" opacity="0.18" />
+                                      </g>
+                                      <text x="60" y="80" fill="#e6e6e6" font-family="Montserrat,Arial" font-size="32">Diffused lighting — soft, even illumination and minimal hard shadows</text>
+                                  </svg>
+                              </div>
+
+                              <div id="svgTrans" class="inline-svg" style="width:100%;height:100%;display:none">
+                                  <!-- Transmitted SVG -->
+                                  <?xml version="1.0" encoding="UTF-8"?>
+                                  <svg width="100%" height="100%" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+                                      <defs>
+                                          <radialGradient id="backGlowInline" cx="50%" cy="70%" r="60%">
+                                              <stop offset="0%" stop-color="#fff7cc" stop-opacity="0.95"/>
+                                              <stop offset="40%" stop-color="#ffd27f" stop-opacity="0.5"/>
+                                              <stop offset="100%" stop-color="#ff9a3d" stop-opacity="0"/>
+                                          </radialGradient>
+                                      </defs>
+                                      <rect width="100%" height="100%" fill="#0b0b0d" />
+                                      <ellipse cx="600" cy="420" rx="260" ry="160" fill="url(#backGlowInline)" opacity="0.95" />
+                                      <path d="M420 360 C520 180 680 180 780 360 C700 420 520 460 420 360" fill="#c4e7b9" opacity="0.7"/>
+                                      <path d="M520 280 C560 260 640 260 680 280 C660 320 540 320 520 280" fill="#ffffff" opacity="0.18"/>
+                                      <g stroke="#7aa46b" stroke-width="3" opacity="0.5" fill="none">
+                                          <path d="M600 300 L600 460" />
+                                          <path d="M620 310 L540 420" />
+                                          <path d="M580 310 L660 420" />
+                                      </g>
+                                      <text x="60" y="80" fill="#e6e6e6" font-family="Montserrat,Arial" font-size="32">Transmitted lighting — backlit/translucent effect revealing internal structure</text>
+                                  </svg>
+                              </div>
+
+                              <div class="overlay-shadows">
+                                      <div class="oblique-light" id="obliqueLight"></div>
+                                      <div class="oblique-shadow" id="obliqueShadow"></div>
+                                      <div class="diffuse-layer" id="diffuseLayer"></div>
+                                      <div class="transmitted" id="transmittedLayer"></div>
+                              </div>
+                            <div class="dir-arrow" id="dirArrow">Dir: 120°</div>
+                        </div>
+                    </div>
+
+                    <aside class="sim-sidebar">
+                        <div class="side-card" id="controlsCard">
+                            <h4 style="margin:0;color:#fff">Controls</h4>
+                            <div style="color:var(--muted);font-size:13px;margin-top:6px">How to try: Click a lighting type above, then use the sliders to change angle, intensity and softness. Press 1/2/3 to switch panels quickly.</div>
+                            <div id="obliqueControls">
+                                <label>Angle: <span id="angleVal">120</span>°</label>
+                                <input type="range" id="angle" min="0" max="360" value="120">
+                                <label>Intensity: <span id="intVal">0.6</span></label>
+                                <input type="range" id="intensity" min="0" max="4" step="0.01" value="0.6">
+                                <label>Shadow softness: <span id="softVal">0.6</span></label>
+                                <input type="range" id="softness" min="0" max="1" step="0.01" value="0.6">
+                            </div>
+
+                            <div id="diffuseControls" style="display:none">
+                                <label>Spread: <span id="spreadVal">0.4</span></label>
+                                <input type="range" id="spread" min="0" max="1" step="0.01" value="0.4">
+                                <label>Brightness: <span id="diffBright">0.06</span></label>
+                                <input type="range" id="diffBrightness" min="0" max="0.3" step="0.01" value="0.06">
+                                <label>Vignette: <span id="vignetteVal">0.06</span></label>
+                                <input type="range" id="vignette" min="0" max="0.25" step="0.01" value="0.06">
+                            </div>
+
+                            <div id="transControls" style="display:none">
+                                <label>Backlight intensity: <span id="backVal">0.06</span></label>
+                                <input type="range" id="backlight" min="0" max="0.3" step="0.01" value="0.06">
+                                <label>Direction spread: <span id="tSpread">20</span>%</label>
+                                <input type="range" id="tspread" min="0" max="100" step="1" value="20">
+                            </div>
+
+                            <div style="display:flex;gap:8px;margin-top:8px">
+                                <button class="finish" id="resetBtn">Reset</button>
+                            </div>
+                        </div>
+
+                        <div class="side-card">
+                            <h4 style="margin:0;color:#fff">What you'll learn</h4>
+                            <p style="margin:6px 0 0 0;color:var(--muted);font-size:14px;line-height:1.4">Use Oblique lighting to create strong shadows and reveal surface texture. Diffused lighting softens shadows and evens illumination. Transmitted lighting shines through thin materials and reveals translucency.</p>
+                        </div>
+                    </aside>
+                </div>
+
+                <button id="finishBtn" class="finish">Next →</button>
+            </div>
+
+            <aside class="sidebar">
+                <div class="side-card">
+                    <div class="item"><div class="badge">A</div><div class="meta"><h4>Oblique lighting</h4><p>Light placed at an angle to highlight texture and shadows.</p></div></div>
+                    <div class="item"><div class="badge">B</div><div class="meta"><h4>Diffused lighting</h4><p>Soft light that reduces harsh shadows and evens exposure.</p></div></div>
+                    <div class="item"><div class="badge">C</div><div class="meta"><h4>Transmitted lighting</h4><p>Light that passes through a subject (used for thin/transparent materials).</p></div></div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+<script>
+(function(){
+    // Panel selection
+    const panelBtns = document.querySelectorAll('.panel-btn');
+    const obControls = document.getElementById('obliqueControls');
+    const diffControls = document.getElementById('diffuseControls');
+    const transControls = document.getElementById('transControls');
+
+    const obLight = document.getElementById('obliqueLight');
+    const obShadow = document.getElementById('obliqueShadow');
+    const diffuse = document.getElementById('diffuseLayer');
+    const transmitted = document.getElementById('transmittedLayer');
+    const dirArrow = document.getElementById('dirArrow');
+
+    // Oblique controls
+    const angleEl = document.getElementById('angle');
+    const intensityEl = document.getElementById('intensity');
+    const softEl = document.getElementById('softness');
+
+    // Diffuse controls
+    const spreadEl = document.getElementById('spread');
+    const diffBrightEl = document.getElementById('diffBrightness');
+    const vignetteEl = document.getElementById('vignette');
+
+    // Transmitted controls
+    const backlightEl = document.getElementById('backlight');
+    const tspreadEl = document.getElementById('tspread');
+
+    // We use inlined SVGs (`#svgOblique`, `#svgDiffuse`, `#svgTrans`) instead of an external image.
+    // If an external <img id="sceneImg"> exists (legacy), keep graceful handling; otherwise operate on inline SVGs.
+    const sceneImg = document.getElementById('sceneImg');
+    const svgOb = document.getElementById('svgOblique');
+    const svgDiff = document.getElementById('svgDiffuse');
+    const svgTrans = document.getElementById('svgTrans');
+    if (sceneImg) {
+        // ensure the image is requested via JS with a cache-busting timestamp (helps avoid stale cache or local file blocking)
+        const defaultSrc = sceneImg.getAttribute('data-default') || '../assets/lighting-oblique.svg';
+        sceneImg.src = defaultSrc + '?cb=' + Date.now();
+        // log when image loads successfully (helps debug file/protocol issues)
+        sceneImg.addEventListener('load', ()=>{ console.log('Scene image loaded:', sceneImg.src); });
+    }
+    function showPanel(name){
+        panelBtns.forEach(b=> b.classList.toggle('active', b.dataset.panel===name));
+        obControls.style.display = name==='oblique' ? 'block' : 'none';
+        diffControls.style.display = name==='diffuse' ? 'block' : 'none';
+        transControls.style.display = name==='transmitted' ? 'block' : 'none';
+        // If an external sceneImg exists, attempt to swap it (legacy). Otherwise toggle inlined SVGs.
+        if (sceneImg) {
+            if (name === 'oblique') sceneImg.src = '../assets/lighting-oblique.svg?cb=' + Date.now();
+            else if (name === 'diffuse') sceneImg.src = '../assets/lighting-diffuse.svg?cb=' + Date.now();
+            else if (name === 'transmitted') sceneImg.src = '../assets/lighting-transmitted.svg?cb=' + Date.now();
+        } else {
+            if (svgOb && svgDiff && svgTrans) {
+                svgOb.style.display = name==='oblique' ? '' : 'none';
+                svgDiff.style.display = name==='diffuse' ? '' : 'none';
+                svgTrans.style.display = name==='transmitted' ? '' : 'none';
+            }
+        }
+        // adjust scene overlay visibility
+        obLight.style.opacity = name==='oblique' ? intensityEl.value : 0;
+        obShadow.style.opacity = name==='oblique' ? softEl.value : 0;
+        diffuse.style.opacity = name==='diffuse' ? diffBrightEl.value : 0;
+        transmitted.style.opacity = name==='transmitted' ? backlightEl.value : 0;
+    }
+
+    panelBtns.forEach(b=> b.addEventListener('click', ()=> showPanel(b.dataset.panel)));
+
+    // update oblique angle/opacity and shadow softness
+    function updateOblique(){
+        const a = Number(angleEl.value);
+    const intensity = Number(intensityEl.value);
+    const softness = Number(softEl.value);
+    // set gradient directions using degrees
+    // Use intensity to scale the highlight alpha but clamp CSS opacity to [0,1] so overlays remain valid.
+    const highlightAlpha = Math.min(1, intensity * 0.12);
+    obLight.style.background = `linear-gradient(${a}deg, rgba(255,255,255,${highlightAlpha}), rgba(255,255,255,0))`;
+    obShadow.style.background = `linear-gradient(${a+180}deg, rgba(0,0,0,${0.65*softness}), rgba(0,0,0,0))`;
+    obLight.style.opacity = Math.min(1, intensity); // allow intensity to visually increase but clamp at 1 for CSS opacity
+    obShadow.style.opacity = softness;
+        dirArrow.textContent = 'Dir: ' + a + '°';
+        document.getElementById('angleVal').textContent = a;
+    // show raw intensity value (user-visible) but keep overlay values clamped internally
+    document.getElementById('intVal').textContent = intensity.toFixed(2);
+        document.getElementById('softVal').textContent = softness;
+    }
+
+    angleEl.addEventListener('input', updateOblique);
+    intensityEl.addEventListener('input', updateOblique);
+    softEl.addEventListener('input', updateOblique);
+
+    // diffuse handlers
+    function updateDiffuse(){
+        const spread = Number(spreadEl.value);
+        const bright = Number(diffBrightEl.value);
+        const vign = Number(vignetteEl.value);
+        // radial position and strength
+        diffuse.style.background = `radial-gradient(circle at 50% 40%, rgba(255,255,255,${bright}) , rgba(255,255,255,${Math.max(0,bright-0.02)}) ${Math.round(spread*40)}%, rgba(0,0,0,${vign}) 100%)`;
+        diffuse.style.opacity = bright > 0 ? 1 : 0;
+        document.getElementById('spreadVal').textContent = spread;
+        document.getElementById('diffBright').textContent = bright;
+        document.getElementById('vignetteVal').textContent = vign;
+    }
+    spreadEl.addEventListener('input', updateDiffuse);
+    diffBrightEl.addEventListener('input', updateDiffuse);
+    vignetteEl.addEventListener('input', updateDiffuse);
+
+    // transmitted
+    function updateTrans(){
+        const back = Number(backlightEl.value);
+        const tsp = Number(tspreadEl.value);
+        // create a directional soft glow from behind
+        const spreadPct = Math.max(1, tsp);
+        transmitted.style.background = `radial-gradient(circle at 50% 60%, rgba(255,255,255,${back}), rgba(255,255,255,${back*0.4}) ${spreadPct}%, rgba(0,0,0,0) 120%)`;
+        transmitted.style.opacity = back > 0 ? 1 : 0;
+        document.getElementById('backVal').textContent = back;
+        document.getElementById('tSpread').textContent = tsp;
+    }
+    backlightEl.addEventListener('input', updateTrans);
+    tspreadEl.addEventListener('input', updateTrans);
+
+    // Reset
+    document.getElementById('resetBtn').addEventListener('click', ()=>{
+        // reset values
+        angleEl.value = 120; intensityEl.value = 0.6; softEl.value = 0.6; spreadEl.value = 0.4; diffBrightEl.value = 0.06; vignetteEl.value = 0.06; backlightEl.value = 0.06; tspreadEl.value = 20;
+        updateOblique(); updateDiffuse(); updateTrans();
+    });
+
+    // Preset quick-demo buttons
+    document.getElementById('presetOb').addEventListener('click', ()=>{
+        // oblique: strong directional light
+        angleEl.value = 120; intensityEl.value = 0.9; softEl.value = 0.75;
+        updateOblique(); showPanel('oblique');
+    });
+    document.getElementById('presetDiff').addEventListener('click', ()=>{
+        // diffuse: soft, even lighting
+        spreadEl.value = 0.6; diffBrightEl.value = 0.12; vignetteEl.value = 0.02;
+        updateDiffuse(); showPanel('diffuse');
+    });
+    document.getElementById('presetTrans').addEventListener('click', ()=>{
+        // transmitted: clear backlight
+        backlightEl.value = 0.14; tspreadEl.value = 30;
+        updateTrans(); showPanel('transmitted');
+    });
+
+    // Initial update
+    updateOblique(); updateDiffuse(); updateTrans();
+    // Ensure the initial panel and image are applied
+    showPanel('oblique');
+
+    // next button -> go to quiz 2 like module2
+    document.getElementById('finishBtn').addEventListener('click', ()=>{
+        window.location.href = '../quiz/quiz2.html';
+    });
+
+    // image fallback (only if an external <img id="sceneImg"> exists)
+    if (sceneImg) {
+        sceneImg.addEventListener('error', ()=>{
+            sceneImg.style.display = 'none';
+            const s = document.getElementById('scene');
+            const failingUrl = sceneImg.src || '(unknown)';
+            console.error('Scene image failed to load:', failingUrl);
+            if (s) s.innerHTML = `<div style="color:var(--muted);padding:18px;text-align:center">Image not found: ${failingUrl}</div>`;
+        });
+    }
+
+    // Orientation helpers (reuse pattern from module2)
+    const overlay = document.createElement('div');
+    overlay.className = 'landscape-overlay';
+    overlay.style.display='none'; // css not included here, kept minimal
+    document.body.appendChild(overlay);
+
+    // panel keyboard shortcuts (1/2/3)
+    document.addEventListener('keydown', (e)=>{
+        if(e.key==='1') showPanel('oblique');
+        if(e.key==='2') showPanel('diffuse');
+        if(e.key==='3') showPanel('transmitted');
+    });
+
+})();
+</script>
+</body>
+</html>
