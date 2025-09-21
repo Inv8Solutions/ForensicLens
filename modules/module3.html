@@ -22,8 +22,29 @@
         .controls{display:flex;gap:8px;flex-wrap:wrap}
         .ctrl{background:var(--card);border-radius:10px;padding:10px;border:2px solid var(--card-border);color:var(--muted);font-size:14px}
         .panel-list{display:flex;gap:10px}
-        .panel-btn{background:#141417;border-radius:10px;padding:10px 12px;border:1px solid rgba(179,179,183,0.06);cursor:pointer;color:var(--muted);font-weight:700}
-        .panel-btn.active{background:linear-gradient(90deg,#ff6b6b,#e23b3b);color:#fff}
+        .panel-list{display:flex;gap:10px;align-items:center}
+    /* Module2-style progress pills (copied exact) */
+    .progress-overlay{display: flex; justify-content:space-between;}
+    .progress-area{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+    .progress{display:flex;gap:8px;padding:8px;border-radius:10px;border:1px dashed rgba(255,255,255,0.04);background:transparent;align-items:center}
+            .prog-pill {
+                background: #303033; /* default dark segment */
+                transition: background .25s ease, box-shadow .25s ease;
+                box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+            }
+            .prog-pill.active {
+                background: linear-gradient(90deg,#ff6b6b,#e23b3b);
+                box-shadow: 0 6px 18px rgba(226,59,59,0.25);
+            }
+            .prog-pill.completed{
+                background: linear-gradient(90deg,#ff6b6b,#e23b3b);
+                opacity: 0.7;
+                box-shadow: none;
+            }
+            .prog-pill.active{background:linear-gradient(90deg,#ff6b6b,#e23b3b);box-shadow:0 6px 14px rgba(226,59,59,0.14)}
+        /* keep fallback older classes for compatibility */
+        .progress-wrap{display:flex;align-items:center;gap:18px;width:100%}
+        .progress-bar{display:flex;gap:12px;align-items:center;justify-content:center;flex:1 1 auto;max-width:480px;width:100%}
 
         .simulator{display:grid;grid-template-columns:1fr 340px;gap:18px}
         .sim-main{background:#0f0f10;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;min-height:360px;position:relative}
@@ -77,100 +98,110 @@
         <div class="layout">
             <div class="main">
                 <div style="display:flex;justify-content:space-between;align-items:center">
-                    <div style="display:flex;gap:12px;align-items:center">
-                        <div class="panel-list" role="tablist" aria-label="Lighting types">
-                            <button class="panel-btn active" data-panel="oblique">Oblique</button>
-                            <button class="panel-btn" data-panel="diffuse">Diffused</button>
-                            <button class="panel-btn" data-panel="transmitted">Transmitted</button>
+                    <div class="progress-area" style="max-width:520px;width:100%;margin-bottom:14px">
+                        <div class="progress-overlay">
+                            <p>Content Progress</p>
+                            <p id="progressCount">1/3</p>
                         </div>
-                        <div style="margin-left:12px;display:flex;gap:8px;align-items:center">
-                            <button class="ctrl" id="presetOb">Show Oblique</button>
-                            <button class="ctrl" id="presetDiff">Show Diffuse</button>
-                            <button class="ctrl" id="presetTrans">Show Transmitted</button>
+                        <div class="progress" style="display:flex;gap:8px;width:100%">
+                            <div class="prog-pill active" id="seg1" style="flex:1;height:20px;border-radius:10px" data-step="1"></div>
+                            <div class="prog-pill" id="seg2" style="flex:1;height:20px;border-radius:10px" data-step="2"></div>
+                            <div class="prog-pill" id="seg3" style="flex:1;height:20px;border-radius:10px" data-step="3"></div>
                         </div>
                     </div>
-                    <div style="color:var(--muted);font-size:13px">Interactive simulator — adjust controls to see effect</div>
+                </div>
+
+                <!-- Learnings for the module (moved above simulator) -->
+                <div class="side-card" style="margin-bottom:14px">
+                    <h4 style="margin:0;color:#fff">Learnings — Oblique lighting</h4>
+                    <ul style="margin:8px 0 0 18px;color:var(--muted);line-height:1.5">
+                        <li>Oblique lighting (grazing light) emphasizes surface texture by casting long shadows.</li>
+                        <li>Small changes in angle strongly affect shadow direction and highlight location.</li>
+                        <li>Hard shadows reveal micro-relief; penumbras indicate distance and softness of the light source.</li>
+                        <li>Specular highlights show surface gloss and orientation — useful for material identification.</li>
+                        <li>Combine oblique lighting with diffused fills to reveal both texture and form without losing detail.</li>
+                    </ul>
                 </div>
 
                 <div class="simulator">
                     <div class="sim-main">
                         <div class="scene" id="scene">
                               <!-- Inline SVGs to avoid external file loading issues (file:// CORS or path problems) -->
-                                                            <div id="svgOblique" class="inline-svg" style="width:100%;height:100%">
-                                                                    <!-- Layered Oblique SVG: base surface, object, hard shadow, soft penumbra, specular, texture/grain -->
-                                                                    <svg width="100%" height="100%" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" aria-hidden="false" role="img">
-                                                                        <defs>
-                                                                            <!-- directional highlight gradient -->
-                                                                            <linearGradient id="ob_highlight" x1="0" y1="0" x2="1" y2="0">
-                                                                                <stop offset="0%" stop-color="#fff" stop-opacity="0.95" />
-                                                                                <stop offset="30%" stop-color="#fff" stop-opacity="0.45" />
-                                                                                <stop offset="100%" stop-color="#fff" stop-opacity="0" />
-                                                                            </linearGradient>
+                              <div id="svgOblique" class="inline-svg" style="width:100%;height:100%">
+                                      <!-- Layered Oblique SVG: base surface, object, hard shadow, soft penumbra, specular, texture/grain -->
+                                      <svg width="100%" height="100%" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" aria-hidden="false" role="img">
+                                          <defs>
+                                              <!-- directional highlight gradient -->
+                                              <linearGradient id="ob_highlight" x1="0" y1="0" x2="1" y2="0">
+                                                  <stop offset="0%" stop-color="#fff" stop-opacity="0.95" />
+                                                  <stop offset="30%" stop-color="#fff" stop-opacity="0.45" />
+                                                  <stop offset="100%" stop-color="#fff" stop-opacity="0" />
+                                              </linearGradient>
 
-                                                                            <!-- thin hard shadow (sharp) -->
-                                                                            <filter id="hardShadow" x="-50%" y="-50%" width="200%" height="200%" filterUnits="objectBoundingBox">
-                                                                                <feDropShadow dx="48" dy="34" stdDeviation="6" flood-color="#000" flood-opacity="0.7" />
-                                                                            </filter>
+                                              <!-- thin hard shadow (sharp) -->
+                                              <filter id="hardShadow" x="-50%" y="-50%" width="200%" height="200%" filterUnits="objectBoundingBox">
+                                                  <feDropShadow dx="48" dy="34" stdDeviation="6" flood-color="#000" flood-opacity="0.7" />
+                                              </filter>
 
-                                                                            <!-- wide soft penumbra -->
-                                                                            <radialGradient id="penumbra" cx="0.75" cy="0.8" r="0.7">
-                                                                                <stop offset="0%" stop-color="#000" stop-opacity="0.45" />
-                                                                                <stop offset="60%" stop-color="#000" stop-opacity="0.18" />
-                                                                                <stop offset="100%" stop-color="#000" stop-opacity="0" />
-                                                                            </radialGradient>
+                                              <!-- wide soft penumbra -->
+                                              <radialGradient id="penumbra" cx="0.75" cy="0.8" r="0.7">
+                                                  <stop offset="0%" stop-color="#000" stop-opacity="0.45" />
+                                                  <stop offset="60%" stop-color="#000" stop-opacity="0.18" />
+                                                  <stop offset="100%" stop-color="#000" stop-opacity="0" />
+                                              </radialGradient>
 
-                                                                            <!-- subtle surface grain pattern -->
-                                                                            <pattern id="grain" width="6" height="6" patternUnits="userSpaceOnUse">
-                                                                                <rect width="6" height="6" fill="rgba(0,0,0,0)" />
-                                                                                <circle cx="1" cy="1" r="0.6" fill="rgba(0,0,0,0.02)" />
-                                                                            </pattern>
+                                              <!-- subtle surface grain pattern -->
+                                              <pattern id="grain" width="6" height="6" patternUnits="userSpaceOnUse">
+                                                  <rect width="6" height="6" fill="rgba(0,0,0,0)" />
+                                                  <circle cx="1" cy="1" r="0.6" fill="rgba(0,0,0,0.02)" />
+                                              </pattern>
 
-                                                                            <!-- tiny specular glint -->
-                                                                            <radialGradient id="glint" cx="30%" cy="20%" r="30%">
-                                                                                <stop offset="0%" stop-color="#fff" stop-opacity="0.95" />
-                                                                                <stop offset="50%" stop-color="#fff" stop-opacity="0.45" />
-                                                                                <stop offset="100%" stop-color="#fff" stop-opacity="0" />
-                                                                            </radialGradient>
-                                                                        </defs>
+                                              <!-- tiny specular glint -->
+                                              <radialGradient id="glint" cx="30%" cy="20%" r="30%">
+                                                  <stop offset="0%" stop-color="#fff" stop-opacity="0.95" />
+                                                  <stop offset="50%" stop-color="#fff" stop-opacity="0.45" />
+                                                  <stop offset="100%" stop-color="#fff" stop-opacity="0" />
+                                              </radialGradient>
+                                          </defs>
 
-                                                                        <!-- dark backdrop / table surface -->
-                                                                        <rect width="100%" height="100%" fill="#0b0b0d" />
+                                          <!-- dark backdrop / table surface -->
+                                          <rect width="100%" height="100%" fill="#0b0b0d" />
 
-                                                                        <!-- ground plane subtle gradient for depth -->
-                                                                        <rect x="60" y="460" width="1080" height="260" rx="14" fill="url(#penumbra)" opacity="0.35" />
+                                          <!-- ground plane subtle gradient for depth -->
+                                          <rect x="60" y="460" width="1080" height="260" rx="14" fill="url(#penumbra)" opacity="0.35" />
 
-                                                                        <!-- object group (slightly off-center to left) -->
-                                                                        <g id="obj" transform="translate(320,160)">
-                                                                            <!-- base object silhouette with subtle bevel -->
-                                                                            <ellipse cx="260" cy="170" rx="140" ry="98" fill="#d7d7d7" />
+                                          <!-- object group (slightly off-center to left) -->
+                                          <g id="obj" transform="translate(320,160)">
+                                              <!-- base object silhouette with subtle bevel -->
+                                              <ellipse cx="260" cy="170" rx="140" ry="98" fill="#d7d7d7" />
 
-                                                                            <!-- surface texture overlay (multiply subtle) -->
-                                                                            <ellipse cx="260" cy="170" rx="140" ry="98" fill="url(#grain)" opacity="0.35" />
+                                              <!-- surface texture overlay (multiply subtle) -->
+                                              <ellipse cx="260" cy="170" rx="140" ry="98" fill="url(#grain)" opacity="0.35" />
 
-                                                                            <!-- sharp contact shadow (hard edge) applied via filter for directional light -->
-                                                                            <ellipse cx="420" cy="360" rx="210" ry="56" fill="#000" opacity="0.62" transform="skewX(-18)" filter="url(#hardShadow)" />
+                                              <!-- sharp contact shadow (hard edge) applied via filter for directional light -->
+                                              <ellipse cx="420" cy="360" rx="210" ry="56" fill="#000" opacity="0.62" transform="skewX(-18)" filter="url(#hardShadow)" />
 
-                                                                            <!-- soft penumbra behind hard shadow -->
-                                                                            <ellipse cx="420" cy="360" rx="260" ry="86" fill="url(#penumbra)" opacity="0.42" transform="skewX(-18)" />
+                                              <!-- soft penumbra behind hard shadow -->
+                                              <ellipse cx="420" cy="360" rx="260" ry="86" fill="url(#penumbra)" opacity="0.42" transform="skewX(-18)" />
 
-                                                                            <!-- oblique highlight: elongated, rotated gradient to simulate grazing light -->
-                                                                            <ellipse cx="195" cy="100" rx="90" ry="36" fill="url(#ob_highlight)" transform="rotate(-28 195 100)" opacity="0.95" />
+                                              <!-- oblique highlight: elongated, rotated gradient to simulate grazing light -->
+                                              <ellipse cx="195" cy="100" rx="90" ry="36" fill="url(#ob_highlight)" transform="rotate(-28 195 100)" opacity="0.95" />
 
-                                                                            <!-- specular glint: small bright spot where surface faces light -->
-                                                                            <ellipse cx="170" cy="82" rx="12" ry="6" fill="url(#glint)" opacity="0.95" />
+                                              <!-- specular glint: small bright spot where surface faces light -->
+                                              <ellipse cx="170" cy="82" rx="12" ry="6" fill="url(#glint)" opacity="0.95" />
 
-                                                                            <!-- faint scratches / texture strokes to accentuate relief -->
-                                                                            <g stroke="#000" stroke-opacity="0.06" stroke-width="2" fill="none">
-                                                                                <path d="M160 80 q40 26 90 18" />
-                                                                                <path d="M150 120 q60 22 110 26" />
-                                                                                <path d="M170 150 q50 18 95 12" />
-                                                                            </g>
-                                                                        </g>
+                                              <!-- faint scratches / texture strokes to accentuate relief -->
+                                              <g stroke="#000" stroke-opacity="0.06" stroke-width="2" fill="none">
+                                                  <path d="M160 80 q40 26 90 18" />
+                                                  <path d="M150 120 q60 22 110 26" />
+                                                  <path d="M170 150 q50 18 95 12" />
+                                              </g>
+                                          </g>
 
-                                                                        <!-- label -->
-                                                                        <text x="60" y="80" fill="#e6e6e6" font-family="Montserrat,Arial" font-size="28">Oblique lighting — directional grazing light producing strong texture &amp; shadow</text>
-                                                                    </svg>
-                                                            </div>
+                                          <!-- label -->
+                                          <text x="60" y="80" fill="#e6e6e6" font-family="Montserrat,Arial" font-size="28">Oblique lighting — directional grazing light producing strong texture &amp; shadow</text>
+                                      </svg>
+                              </div>
 
                               <div id="svgDiffuse" class="inline-svg" style="width:100%;height:100%;display:none">
                                   <!-- Diffuse SVG -->
@@ -261,10 +292,7 @@
                             </div>
                         </div>
 
-                        <div class="side-card">
-                            <h4 style="margin:0;color:#fff">What you'll learn</h4>
-                            <p style="margin:6px 0 0 0;color:var(--muted);font-size:14px;line-height:1.4">Use Oblique lighting to create strong shadows and reveal surface texture. Diffused lighting softens shadows and evens illumination. Transmitted lighting shines through thin materials and reveals translucency.</p>
-                        </div>
+                        <!-- removed duplicate learnings card (moved above) -->
                     </aside>
                 </div>
 
@@ -323,7 +351,12 @@
         sceneImg.addEventListener('load', ()=>{ console.log('Scene image loaded:', sceneImg.src); });
     }
     function showPanel(name){
-        panelBtns.forEach(b=> b.classList.toggle('active', b.dataset.panel===name));
+        panelBtns.forEach(b=>{
+            const isActive = b.dataset.panel===name;
+            b.classList.toggle('active', isActive);
+            const pill = b.querySelector('.prog-pill');
+            if (pill) pill.classList.toggle('active', isActive);
+        });
         obControls.style.display = name==='oblique' ? 'block' : 'none';
         diffControls.style.display = name==='diffuse' ? 'block' : 'none';
         transControls.style.display = name==='transmitted' ? 'block' : 'none';
@@ -408,19 +441,19 @@
         updateOblique(); updateDiffuse(); updateTrans();
     });
 
-    // Preset quick-demo buttons
-    document.getElementById('presetOb').addEventListener('click', ()=>{
-        // oblique: strong directional light
+    // Preset quick-demo buttons (guarded)
+    const presetOb = document.getElementById('presetOb');
+    if (presetOb) presetOb.addEventListener('click', ()=>{
         angleEl.value = 120; intensityEl.value = 0.9; softEl.value = 0.75;
         updateOblique(); showPanel('oblique');
     });
-    document.getElementById('presetDiff').addEventListener('click', ()=>{
-        // diffuse: soft, even lighting
+    const presetDiff = document.getElementById('presetDiff');
+    if (presetDiff) presetDiff.addEventListener('click', ()=>{
         spreadEl.value = 0.6; diffBrightEl.value = 0.12; vignetteEl.value = 0.02;
         updateDiffuse(); showPanel('diffuse');
     });
-    document.getElementById('presetTrans').addEventListener('click', ()=>{
-        // transmitted: clear backlight
+    const presetTrans = document.getElementById('presetTrans');
+    if (presetTrans) presetTrans.addEventListener('click', ()=>{
         backlightEl.value = 0.14; tspreadEl.value = 30;
         updateTrans(); showPanel('transmitted');
     });
@@ -430,10 +463,72 @@
     // Ensure the initial panel and image are applied
     showPanel('oblique');
 
-    // next button -> go to quiz 2 like module2
-    document.getElementById('finishBtn').addEventListener('click', ()=>{
-        window.location.href = '../quiz/quiz2.html';
-    });
+        // Progress pills (4-step) — update numeric counter and panel mapping
+        const pills = [
+            document.getElementById('seg1'),
+            document.getElementById('seg2'),
+            document.getElementById('seg3')
+        ];
+        const progressCount = document.getElementById('progressCount');
+        let currentStep = 1; // 1..3
+
+        function updatePills(step){
+            // highlight only the current pill (single active state)
+            pills.forEach((p,i)=>{
+                if (!p) return;
+                // completed for previous steps
+                if (i < (step-1)) {
+                    p.classList.add('completed');
+                    p.classList.remove('active');
+                } else if (i === (step-1)) {
+                    p.classList.add('active');
+                    p.classList.remove('completed');
+                } else {
+                    p.classList.remove('active');
+                    p.classList.remove('completed');
+                }
+            });
+            // update numeric counter (second <p>)
+            if (progressCount) progressCount.textContent = `${step}/3`;
+            // show mapped panels for steps
+            const map = {1:'oblique',2:'diffuse',3:'transmitted'};
+            if (map[step]) showPanel(map[step]);
+        }
+
+        // pill clicks
+        pills.forEach(p => {
+            if (!p) return;
+            p.addEventListener('click', ()=>{
+                const step = Number(p.dataset.step) || 1;
+                currentStep = step;
+                updatePills(step);
+            });
+        });
+
+        // Next button advances; final step navigates to quiz
+        document.getElementById('finishBtn').addEventListener('click', ()=>{
+            if (currentStep < 3) {
+                currentStep++;
+                // defensive sync: clear all, then set current
+                pills.forEach(p => p && p.classList.remove('active'));
+                const activePill = pills[currentStep-1];
+                if (activePill) activePill.classList.add('active');
+                // update panels/counter via updatePills for consistent behavior
+                updatePills(currentStep);
+                // explicitly sync the numeric counter in case other scripts update it differently
+                if (progressCount) progressCount.textContent = `${currentStep}/3`;
+                if (currentStep === 3){
+                    // optional: change the top learning header to Summary
+                    const learn = document.querySelector('.side-card h4');
+                    if (learn) learn.textContent = 'Summary — Lighting techniques';
+                }
+            } else {
+                window.location.href = '../quiz/quiz2.html';
+            }
+        });
+
+        // initialize
+        updatePills(1);
 
     // image fallback (only if an external <img id="sceneImg"> exists)
     if (sceneImg) {
