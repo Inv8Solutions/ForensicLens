@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0" />
+    <title>Module 3: Lighting Techniques</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;400&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+        <!-- Font Awesome for icons -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        fontFamily: { sans: ['Inter','ui-sans-serif','system-ui'], heading: ['Montserrat','ui-sans-serif','system-ui'] },
+                        colors: { bg: '#17171a', card: '#26262b', muted: '#b7b7bb' }
+                    }
+                }
+            }
+        </script>
+    </head>
+    <body>
+        <div class="min-h-dvh flex flex-col items-center bg-bg text-white font-sans">
+            <div class="w-full max-w-[420px] flex flex-col min-h-dvh px-4 sm:px-6  mt-[30px]" id="page">
+                <div class="flex items-center gap-2 justify-start mt-1 mb-3 sm:mb-5">
+                    <button class="w-[45px] h-[45px] rounded-xl bg-[#1f1f23] border border-white/10 text-muted flex items-center justify-center" onclick="history.back()" aria-label="Back">◀</button>
+                    <div class="flex-1 text-center mb-[24px]">
+                        <p class="font-heading font-bold text-[20px] leading-tight m-0">Module 3</p>
+                        <p class="font-semibold text-[#d9d9dc] text-[16px] mt-1" id="stepLabel">Oblique Lighting</p>
+                    </div>
+                    <div class="w-10"></div>
+                </div>
+
+                <main id="content" class="flex-1"></main>
+
+                <div class="mt-auto sticky bottom-4">
+                    <div class="flex gap-3">
+                        <button class="hidden sm:inline-flex flex-1 sm:flex-none sm:w-auto rounded-xl py-3 px-4 font-semibold text-white/90 border border-white/15 bg-white/5 hover:bg-white/10 active:translate-y-px" id="backBtn">Back</button>
+                        <button class="flex-1 rounded-xl py-3.5 px-5 font-bold text-white bg-gradient-to-b from-[#ff6b6b] to-[#e23b3b] shadow-[0_10px_24px_rgba(226,59,59,0.25)] active:translate-y-px" id="nextBtn">Next →</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        (function(){
+            const content = document.getElementById('content');
+            const nextBtn = document.getElementById('nextBtn');
+            const backBtn = document.getElementById('backBtn');
+            const stepLabel = document.getElementById('stepLabel');
+            const progressSmall = document.getElementById('progressSmall');
+
+            // 3-part flow scaffold + sub-steps inside step 3
+            let step = 1; // 1..3
+            let subStep = 1; // 1..5 within step 3
+            let practice = false; // interactive practice mode after subStep 5
+
+            function render(){
+                if (progressSmall) progressSmall.textContent = step + '/3';
+                // Keep this module focused on Oblique Lighting across parts
+                stepLabel.textContent = 'Oblique Lighting';
+
+                // back button visibility
+                if (backBtn) backBtn.classList.toggle('hidden', step === 1 && !practice);
+
+                if (practice){
+                    // Interactive practice view
+                    content.innerHTML = `
+                        <section class="text-center mb-4">
+                            <h1 class="font-heading font-extrabold text-2xl leading-tight">Interactive Practice</h1>
+                            <div class="mt-2 text-white font-bold">5</div>
+                            <p class="text-white/70 text-sm mt-1">Drag the flashlight to find the optimal angle</p>
+                        </section>
+
+                        <section class="bg-[#3b3b41] border border-white/10 rounded-2xl p-4 sm:p-5 mx-auto text-center shadow-[0_10px_30px_rgba(0,0,0,0.24)]">
+                            <div id="practiceArea" class="relative rounded-xl border border-white/10 bg-[#2a2a2f] h-[320px] overflow-hidden select-none">
+                                <div class="absolute inset-4 rounded-lg border border-white/10 opacity-50"></div>
+                                <div class="absolute left-1/2 -translate-x-1/2 bottom-20 w-[220px] h-[90px] rounded-md border border-white/10 opacity-40"></div>
+
+                                <!-- detail layer that becomes visible as intensity increases -->
+                                <div id="detailLayer" class="absolute inset-8 rounded-lg pointer-events-none" style="opacity:0; mix-blend:screen; background:
+                                    repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0 6px, rgba(255,255,255,0.0) 6px 12px);
+                                "></div>
+
+                                <!-- light overlay indicating direction -->
+                                <div id="lightOverlay" class="absolute inset-0 pointer-events-none" style="opacity:.25; background: linear-gradient(90deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.0) 60%);"></div>
+
+                                <!-- draggable flashlight -->
+                                <div id="flashlight" class="absolute bottom-8 left-1/2 -translate-x-1/2 cursor-grab active:cursor-grabbing text-[#ff3b3f]">
+                                    <i class="fa-solid fa-flashlight text-[44px]" aria-hidden="true"></i>
+                                    <div id="angleTooltip" class="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[11px] px-2 py-1 rounded-md border border-white/10 shadow whitespace-nowrap">Angle: 40°</div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-between mt-3">
+                                <button id="resetBtn" class="inline-flex items-center gap-2 rounded-lg py-2 px-3 font-semibold text-white/90 border border-white/15 bg-white/5 hover:bg-white/10 active:translate-y-px">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                    Reset
+                                </button>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-white/70 text-sm">Reveal Intensity</span>
+                                    <div class="h-2 w-28 rounded-full bg-white/10 overflow-hidden">
+                                        <div id="intensityFill" class="h-full w-0 bg-gradient-to-r from-[#ff3b3f] via-[#ff9f3f] to-[#22c55e]"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="resultBanner" class="mt-4 rounded-xl border border-white/10 px-4 py-3 text-center font-semibold hidden"></div>
+                        </section>
+                    `;
+
+                    // configure practice behavior
+                    setupPractice();
+                    nextBtn.textContent = 'Finish →';
+                } else if (step === 1){
+                    content.innerHTML = `
+                        <section class="bg-[#2b2b30] border border-white/10 rounded-2xl p-5 shadow-[0_10px_30px_rgba(0,0,0,0.24)] h-[334px]" aria-label="What is Oblique Lighting?">
+                            <h1 class="font-heading text-2xl font-bold mb-2">What is Oblique Lighting?</h1>
+                            <p class="text-[#e9e9ec] leading-relaxed text-base mb-3">Oblique lighting is when a light source is positioned at a low angle (about 10°–45°) to the surface being photographed.</p>
+                            <p class="text-[#e9e9ec] leading-relaxed text-sm mb-3"><span class="font-semibold">Purpose:</span> It makes small details, textures, or impressions stand out by casting shadows and highlights.</p>
+                            <div class="mt-2 bg-[#3a3a40] rounded-xl p-3 border border-white/10 text-muted text-[13px]">💡 <span class="font-semibold text-white ">Tip:</span> Think of shining a flashlight across the floor at night, you'll suddenly notice dust, scratches, or tiny objects you wouldn't see under overhead lighting.</div>
+                        </section>
+                    `;
+                    nextBtn.textContent = 'Next →';
+                }
+                                else if (step === 2){
+                                        content.innerHTML = `
+                                                <!-- Forensic Use Cases card -->
+                                                <section class="bg-[#2b2b30] border border-white/10 rounded-2xl p-5 shadow-[0_10px_30px_rgba(0,0,0,0.24)] mb-3" aria-label="Forensic Use Cases">
+                                                        <h2 class="font-heading text-[24px] font-bold mb-3">Forensic Use Cases</h2>
+                                                        <ul class="list-disc pl-5 space-y-1 text-[#e9e9ec] text-[16px]">
+                                                                <li>To reveal latent details that are invisible under normal lighting.</li>
+                                                                <li>To document surface irregularities, such as:</li>
+                                                        </ul>
+                                                </section>
+
+                                                <!-- Icon grid: 2 columns -->
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                                                        <!-- Fingerprints -->
+                            <div class="bg-[#2f2f34] border border-white/10 rounded-2xl p-4 flex flex-col items-center text-center">
+                                <img src="../assets/module3assets/fingerprints.png" alt="Fingerprints icon" class="w-11 h-11 object-contain mb-2" loading="lazy" decoding="async" />
+                                                                <p class="font-semibold text-[16px]">Fingerprints</p>
+                                                                <p class="text-muted text-[14px] -mt-0.5">on non‑reflective surfaces</p>
+                                                        </div>
+
+                                                        <!-- Footwear -->
+                            <div class="bg-[#2f2f34] border border-white/10 rounded-2xl p-4 flex flex-col items-center text-center">
+                                <img src="../assets/module3assets/footware.png" alt="Footwear/tire impressions icon" class="w-11 h-11 object-contain mb-2" loading="lazy" decoding="async" />
+                                <p class="font-semibold text-[16px]">Footwear</p>
+                                <p class="text-muted text-[14px] -mt-0.5">or tire impressions in dust or soil</p>
+                                                        </div>
+
+                                                        <!-- Tool Marks -->
+                            <div class="bg-[#2f2f34] border border-white/10 rounded-2xl p-4 flex flex-col items-center text-center">
+                                <img src="../assets/module3assets/toolmarks.png" alt="Tool marks icon" class="w-11 h-11 object-contain mb-2" loading="lazy" decoding="async" />
+                                                                <p class="font-semibold text-[16px]">Tool Marks</p>
+                                                                <p class="text-muted text-[14px] -mt-0.5">on wood or metal</p>
+                                                        </div>
+
+                                                        <!-- Scratches -->
+                            <div class="bg-[#2f2f34] border border-white/10 rounded-2xl p-4 flex flex-col items-center text-center">
+                                <img src="../assets/module3assets/scratch.png" alt="Scratches icon" class="w-11 h-11 object-contain mb-2" loading="lazy" decoding="async" />
+                                                                <p class="font-semibold text-[16px]">Scratches</p>
+                                                                <p class="text-muted text-[14px] -mt-0.5">indentations, or document forgeries</p>
+                                                        </div>
+                                                </div>
+
+                                                <!-- Why it works card -->
+                                                <section class="bg-[#2b2b30] border border-white/10 rounded-2xl p-5 shadow-[0_10px_30px_rgba(0,0,0,0.24)]" aria-label="Why Oblique Lighting Works">
+                                                        <h2 class="font-heading text-[16px] font-bold mb-3">Why Oblique Lighting Works</h2>
+                                                        <ul class="list-disc pl-5 space-y-1 text-[#e9e9ec] text-[14px]">
+                                                                <li>Creates shadows that enhance surface texture contrast</li>
+                                                                <li>Reveals details invisible to direct overhead lighting</li>
+                                                                <li>Provides depth perception for three‑dimensional evidence</li>
+                                                        </ul>
+                                                </section>
+                                        `;
+                                        nextBtn.textContent = 'Next →';
+                                }
+                else {
+                    // Step 3: How to Apply Oblique Lighting (mini 5-step guide)
+                    const dots = Array.from({length:5}).map((_,i)=>
+                        `<span class="w-2 h-2 rounded-full ${i+1===subStep?'bg-[#ff3b3f]':'bg-white/20'}"></span>`
+                    ).join('');
+
+                    // build card per subStep
+                    let card = '';
+                    if (subStep === 1){
+                        card = `
+                        <div class="text-white/90 text-sm font-semibold">1</div>
+                        <i class="fa-solid fa-moon text-[40px] mx-auto my-3 text-[#ff3b3f]" aria-hidden="true"></i>
+                        <h3 class="font-heading text-lg font-extrabold">Darken the Area</h3>
+                        <p class="text-white/70 text-sm">Turn off lights and control ambient lighting</p>`;
+                    } else if (subStep === 2){
+                        card = `
+                        <div class="text-white/90 text-sm font-semibold">2</div>
+                        <i class="fa-solid fa-bolt text-[40px] mx-auto my-3 text-[#ff3b3f]" aria-hidden="true"></i>
+                        <h3 class="font-heading text-lg font-extrabold">Position Light at 30°–45°</h3>
+                        <p class="text-white/70 text-sm">Place light source at low angle to surface</p>`;
+                    } else if (subStep === 3){
+                        card = `
+                        <div class="text-white/90 text-sm font-semibold">3</div>
+                        <i class="fa-solid fa-rotate-right text-[40px] mx-auto my-3 text-[#ff3b3f]" aria-hidden="true"></i>
+                        <h3 class="font-heading text-lg font-extrabold">Move Light Around</h3>
+                        <p class="text-white/70 text-sm">Sweep light side‑to‑side until details appear</p>`;
+                    } else if (subStep === 4){
+                        card = `
+                        <div class="text-white/90 text-sm font-semibold">4</div>
+                        <i class="fa-solid fa-camera text-[40px] mx-auto my-3 text-[#ff3b3f]" aria-hidden="true"></i>
+                        <h3 class="font-heading text-lg font-extrabold">Mount Camera on Tripod</h3>
+                        <p class="text-white/70 text-sm">Ensure stability for sharp images</p>`;
+                    } else {
+                        card = `
+                        <div class="text-white/90 text-sm font-semibold">5</div>
+                        <i class="fa-solid fa-camera text-[40px] mx-auto my-3 text-[#ff3b3f]" aria-hidden="true"></i>
+                        <h3 class="font-heading text-lg font-extrabold">Take Multiple Photos</h3>
+                        <p class="text-white/70 text-sm">Capture from different angles and lighting</p>`;
+                    }
+
+                    content.innerHTML = `
+                        <section class="text-center mb-4">
+                            <h1 class="font-heading font-extrabold text-2xl leading-tight">How to Apply<br/>Oblique Lighting</h1>
+                            <div class="mt-2 text-white font-bold">4</div>
+                            <p class="text-white/70 text-sm mt-1">Step-by-step technique guide</p>
+                            <div class="flex justify-center gap-2 mt-2">${dots}</div>
+                        </section>
+
+                        <section class="bg-[#3b3b41] border border-white/10 rounded-2xl p-6 mx-auto text-center shadow-[0_10px_30px_rgba(0,0,0,0.24)]">${card}</section>
+                    `;
+                    nextBtn.textContent = 'Next: Practice →';
+                }
+            }
+
+            nextBtn.addEventListener('click', ()=>{
+                if (!practice){
+                    if (step < 3){
+                        step++;
+                        render();
+                    } else {
+                        // paginate within the mini 5-step guide first
+                        if (subStep < 5){
+                            subStep++;
+                            render();
+                        } else {
+                            practice = true; // enter interactive practice instead of redirect
+                            render();
+                        }
+                    }
+                } else {
+                    // exit practice
+                    window.location.href = '../practice-levels.html';
+                }
+            });
+
+            if (backBtn){
+                backBtn.addEventListener('click', ()=>{
+                    if (practice){
+                        practice = false; // back to last mini-step
+                        render();
+                    } else if (step === 3 && subStep > 1){
+                        subStep--;
+                        render();
+                    } else if (step > 1){
+                        step--;
+                        render();
+                    }
+                });
+            }
+
+            // Keyboard shortcut: Enter/Space/ArrowRight to advance
+            document.addEventListener('keydown', (e)=>{
+                if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight'){
+                    e.preventDefault();
+                    nextBtn.click();
+                }
+            });
+
+            // practice setup function
+            function setupPractice(){
+                const area = document.getElementById('practiceArea');
+                const flashlight = document.getElementById('flashlight');
+                const overlay = document.getElementById('lightOverlay');
+                const detail = document.getElementById('detailLayer');
+                const tooltip = document.getElementById('angleTooltip');
+                const fill = document.getElementById('intensityFill');
+                const banner = document.getElementById('resultBanner');
+                const resetBtn = document.getElementById('resetBtn');
+
+                let dragging = false;
+                // range setup
+                let angle = 40; // default
+
+                function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+
+                function angleToIntensity(a){
+                    // peak around 38 degrees, std ~12
+                    const mu = 38, sigma = 12;
+                    const score = Math.exp(-0.5 * Math.pow((a - mu)/sigma, 2));
+                    return clamp(score, 0, 1);
+                }
+
+                function updateUI(){
+                    tooltip.textContent = `Angle: ${Math.round(angle)}°`;
+                    // rotate overlay to simulate light direction
+                    overlay.style.background = `linear-gradient(${90 - angle}deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.0) 60%)`;
+                    const intensity = angleToIntensity(angle);
+                    detail.style.opacity = String(intensity);
+                    fill.style.width = `${Math.round(intensity * 100)}%`;
+                    // banner feedback
+                    if (angle >= 35 && angle <= 45){
+                        banner.classList.remove('hidden');
+                        banner.className = 'mt-4 rounded-xl border border-white/10 px-4 py-3 text-center font-semibold bg-green-500/15 text-green-400';
+                        banner.textContent = 'Excellent! Perfect angle for maximum detail revelation.';
+                    } else if ((angle >= 28 && angle < 35) || (angle > 45 && angle <= 52)){
+                        banner.classList.remove('hidden');
+                        banner.className = 'mt-4 rounded-xl border border-white/10 px-4 py-3 text-center font-semibold bg-yellow-500/15 text-yellow-300';
+                        banner.textContent = "Good! You're close—fine‑tune the angle.";
+                    } else {
+                        banner.classList.add('hidden');
+                    }
+                }
+
+                function setFromClientX(clientX){
+                    const rect = area.getBoundingClientRect();
+                    const pad = 24; // inner padding to map range
+                    const x = clamp(clientX - rect.left, pad, rect.width - pad);
+                    const t = (x - pad) / (rect.width - 2*pad); // 0..1
+                    angle = 5 + t * 80; // map to 5..85 degrees
+                    // position flashlight
+                    const percent = t * 100;
+                    flashlight.style.left = `calc(${percent}% )`;
+                    flashlight.style.transform = 'translateX(-50%)';
+                    updateUI();
+                }
+
+                // mouse events
+                flashlight.addEventListener('mousedown', (e)=>{ dragging = true; e.preventDefault(); });
+                window.addEventListener('mousemove', (e)=>{ if (dragging) setFromClientX(e.clientX); });
+                window.addEventListener('mouseup', ()=> dragging = false);
+
+                // touch events
+                flashlight.addEventListener('touchstart', (e)=>{ dragging = true; });
+                window.addEventListener('touchmove', (e)=>{ if (dragging && e.touches[0]) setFromClientX(e.touches[0].clientX); }, { passive: true });
+                window.addEventListener('touchend', ()=> dragging = false);
+
+                // reset behavior
+                resetBtn.addEventListener('click', ()=>{
+                    angle = 40;
+                    // center position
+                    const rect = area.getBoundingClientRect();
+                    const pad = 24; const t = (angle - 5)/80; const percent = t*100;
+                    flashlight.style.left = `calc(${percent}% )`;
+                    flashlight.style.transform = 'translateX(-50%)';
+                    updateUI();
+                });
+
+                // initialize
+                resetBtn.click();
+            }
+
+            // initial render
+            render();
+        })();
+        </script>
+    </body>
+    </html>
