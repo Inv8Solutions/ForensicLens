@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0" />
     <title>Module 3: Lighting Techniques</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;400&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-        <!-- Font Awesome for icons -->
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" />
         <script src="https://cdn.tailwindcss.com"></script>
         <script>
             tailwind.config = {
@@ -87,8 +87,9 @@
 
                                 <!-- draggable flashlight -->
                                 <div id="flashlight" class="absolute bottom-8 left-1/2 -translate-x-1/2 cursor-grab active:cursor-grabbing text-[#ff3b3f]">
-                                    <i class="fa-solid fa-flashlight text-[44px]" aria-hidden="true"></i>
-                                    <div id="angleTooltip" class="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[11px] px-2 py-1 rounded-md border border-white/10 shadow whitespace-nowrap">Angle: 40°</div>
+                                    <!-- angle badge to the left -->
+                                    <div id="angleBadge" class="absolute left-[-38px] top-1/2 -translate-y-1/2 bg-black/80 text-white text-[11px] px-2 py-0.5 rounded-md border border-white/10 shadow whitespace-nowrap select-none">40°</div>
+                                    <i class="fa-solid fa-lightbulb text-[44px]" aria-hidden="true" style="display:inline-block;"></i>
                                 </div>
                             </div>
 
@@ -281,10 +282,10 @@
                 const flashlight = document.getElementById('flashlight');
                 const overlay = document.getElementById('lightOverlay');
                 const detail = document.getElementById('detailLayer');
-                const tooltip = document.getElementById('angleTooltip');
                 const fill = document.getElementById('intensityFill');
                 const banner = document.getElementById('resultBanner');
                 const resetBtn = document.getElementById('resetBtn');
+                const angleBadge = document.getElementById('angleBadge');
 
                 let dragging = false;
                 // range setup
@@ -300,7 +301,7 @@
                 }
 
                 function updateUI(){
-                    tooltip.textContent = `Angle: ${Math.round(angle)}°`;
+                    if (angleBadge) angleBadge.textContent = `${Math.round(angle)}°`;
                     // rotate overlay to simulate light direction
                     overlay.style.background = `linear-gradient(${90 - angle}deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.0) 60%)`;
                     const intensity = angleToIntensity(angle);
@@ -356,6 +357,8 @@
 
                 // initialize
                 resetBtn.click();
+
+                // no runtime fallback needed; using free FA lightbulb icon
             }
 
             // initial render
