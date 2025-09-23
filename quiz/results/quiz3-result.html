@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz 3 Results</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;400&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0f0f10;--card:#232326;--muted:#b3b3b7;--accent:#ff3b3f;--card-border:#b3b3b733}
+    html,body{height:100%;margin:0;background:var(--bg);font-family:Inter,Montserrat,Arial;color:#fff}
+    .wrap{max-width:520px;margin:24px auto;padding:18px}
+    .card{background:#232327;border-radius:16px;padding:20px;text-align:center}
+    .title{font-size:20px;font-weight:700;margin-bottom:6px}
+    .subtitle{color:var(--muted);margin-bottom:14px}
+    .score-grid{display:flex;gap:12px;justify-content:center;margin-top:12px}
+    .score-item{background:#141417;border-radius:10px;padding:18px;width:120px}
+    .score-big{font-size:22px;font-weight:700}
+    .actions{margin-top:18px;display:flex;flex-direction:column;gap:12px}
+    .btn{padding:12px;border-radius:12px;border:none;font-weight:700;cursor:pointer}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+    .btn.primary{background:linear-gradient(90deg,#ff6b6b,#e23b3b);color:#fff}
+    .btn:disabled{opacity:0.45;cursor:default}
+
+    .back{background:var(--card);border-radius:12px;border:2px solid var(--card-border);width:56px;height:56px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
+    .helper{color:var(--muted);font-size:13px;margin-top:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div style="display:flex;justify-content:flex-start;margin-bottom:18px">
+      <button class="back" onclick="history.back()" aria-label="Back">◀</button>
+    </div>
+
+    <div class="card">
+      <div class="medal-wrap" aria-hidden="true">
+        <img src="../../assets/medal.png" alt="medal" style="width:56px;height:56px;display:block;object-fit:contain; background:linear-gradient(90deg,#ff6b6b,#e23b3b);color:#fff; border-radius: 100px; width: 100px; height: 100px; padding: 10px;; justify-self: center; margin-bottom: 30px;">
+      </div>
+      <div class="title">Quiz Complete</div>
+      <div class="subtitle">Module 3: Oblique Lighting</div>
+
+      <div class="score-grid" id="scoreGrid">
+        <div class="score-item"><div style="color:var(--muted);font-size:12px">Overall Score</div><div class="score-big" id="pct">0%</div></div>
+        <div class="score-item"><div style="color:var(--muted);font-size:12px">Correct Answers</div><div class="score-big" id="correctCount">0/5</div></div>
+      </div>
+
+      <div class="actions">
+        <button id="retake" class="btn ghost">⟲ Retake Quiz</button>
+        <button id="nextModule" class="btn primary">Next Module →</button>
+        <div id="lockHelper" class="helper" style="display:none">Get at least 4/5 correct to unlock the next module.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Prefer saved score/total; fallback to recompute from answers with key
+    let score = 0, total = 5;
+    try{
+      const s = localStorage.getItem('quiz3_score');
+      const t = localStorage.getItem('quiz3_total');
+      if(s!==null && t!==null){ score = Number(s); total = Number(t); }
+      else {
+        const answers = JSON.parse(localStorage.getItem('quiz3_answers')||'[]');
+        const key = [1,2,1,2,0]; // B,C,B,C,A
+        score = answers.reduce((acc,ans,i)=> acc + (ans===key[i]?1:0), 0);
+        total = key.length;
+      }
+    }catch(e){ console.warn('localStorage unavailable', e); }
+
+    const pct = Math.round((score/total)*100);
+    document.getElementById('pct').textContent = pct + '%';
+    document.getElementById('correctCount').textContent = `${score}/${total}`;
+
+    const nextBtn = document.getElementById('nextModule');
+    const lockHelper = document.getElementById('lockHelper');
+    if(score < 4){ nextBtn.disabled = true; lockHelper.style.display = 'block'; } else { nextBtn.disabled = false; lockHelper.style.display = 'none'; }
+
+    document.getElementById('retake').addEventListener('click', ()=>{
+      localStorage.removeItem('quiz3_answers');
+      window.location.href = '../quiz3.html';
+    });
+    nextBtn.addEventListener('click', ()=>{ window.location.href = '../../training-modules.html'; });
+  </script>
+</body>
+</html>
