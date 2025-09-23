@@ -1,11 +1,131 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0" />
+    <title>Module 4 Quiz — UV Light</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;400&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter','ui-sans-serif','system-ui'], heading: ['Montserrat','ui-sans-serif','system-ui'] },
+                    colors: { bg: '#0f0f10', card: '#232327', muted: '#b3b3b7', accent: '#ff3b3f' }
+                }
+            }
+        }
+    </script>
+    <style>
+        @media only screen and (orientation: landscape){
+            body::before{content:'Please rotate your device to portrait';position:fixed;inset:0;background:#0f0f10;color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;z-index:9999}
+            #main-content{display:none !important}
+        }
+    </style>
 </head>
-<body>
-    
+<body class="min-h-screen bg-bg text-white font-sans overflow-hidden">
+    <div id="main-content" class="max-w-[760px] mx-auto px-4 pt-5 pb-[140px]">
+        <header class="flex flex-col items-center gap-2 text-center">
+            <h1 class="font-heading text-[28px] font-bold leading-tight">Module 4 Quiz</h1>
+            <p class="text-muted">UV Light</p>
+            <div id="progress" class="flex gap-3 mt-2 w-full"></div>
+        </header>
+
+        <main class="mt-4">
+            <section class="bg-card border border-white/5 rounded-2xl p-5">
+                <div class="space-y-3">
+                    <div id="qBadge" class="inline-flex items-center justify-center px-3 h-8 rounded-lg bg-gradient-to-b from-[#ff6b6b] to-[#e23b3b] font-bold">Q1</div>
+                    <h2 id="qText" class="font-semibold text-lg">Question text</h2>
+                    <div id="choices" class="mt-1 flex flex-col gap-3"></div>
+                </div>
+            </section>
+        </main>
+
+        <nav class="fixed left-1/2 -translate-x-1/2 bottom-4 w-[calc(100%-40px)] max-w-[760px] flex flex-col gap-3">
+            <button id="prevBtn" class="w-full h-14 rounded-xl border border-white/10 bg-transparent text-white/60 font-bold disabled:opacity-50">Previous</button>
+            <button id="nextBtn" class="w-full h-16 rounded-xl font-bold text-white bg-gradient-to-r from-[#ff6b6b] to-[#e23b3b] disabled:opacity-45">Next →</button>
+        </nav>
+    </div>
+
+    <script>
+        const quiz = [
+            { q: 'What is the primary purpose of using UV light in forensic photography?', choices: ['To increase the sharpness of photos','To make evidence glow for easier detection','To eliminate shadows on evidence','To make evidence glow for easier detection'], a: 3 },
+            { q: 'Which type of evidence can UV light reveal?', choices: ['Latent fingerprints','Bruises under the skin','Biological fluids','All of the above'], a: 3 },
+            { q: 'Why must the environment be darkened when using UV light in forensic photography?', choices: ['To make the fluorescence more visible','To save camera battery','To increase shutter speed','To reduce reflections on surfaces'], a: 0 },
+            { q: 'What equipment is often placed in front of the camera lens when photographing with UV light?', choices: ['A magnifying lens','A zoom lens','A barrier filter','A polarizer filter'], a: 2 },
+            { q: 'When photographing with UV light, why is it important to use a barrier filter on the camera lens?', choices: ['To soften shadows','To zoom closer to the evidence','To block visible light and capture only fluorescence','To increase camera sharpness'], a: 2 },
+        ];
+
+        let idx = 0;
+        const answers = Array(quiz.length).fill(null);
+
+        const progressEl = document.getElementById('progress');
+        const qBadge = document.getElementById('qBadge');
+        const qText = document.getElementById('qText');
+        const choicesEl = document.getElementById('choices');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+
+        function progressSegment(state){
+            const base = 'h-[14px] rounded-[12px] flex-1 min-w-[38px]';
+            if(state === 'active' || state === 'completed'){
+                return `<div class="${base} bg-gradient-to-r from-[#ff6b6b] to-[#e23b3b]"></div>`
+            }
+            return `<div class="${base} bg-[#3a3a3c]"></div>`
+        }
+
+        function renderProgress(){
+            progressEl.innerHTML = '';
+            for(let i=0;i<quiz.length;i++){
+                let state = 'idle';
+                if(answers[i] !== null) state = 'completed';
+                else if(i === idx) state = 'active';
+                progressEl.insertAdjacentHTML('beforeend', progressSegment(state));
+            }
+        }
+
+        function render(){
+            const item = quiz[idx];
+            qBadge.textContent = 'Q'+(idx+1);
+            qText.textContent = item.q;
+            choicesEl.innerHTML = '';
+            item.choices.forEach((c,i)=>{
+                const choice = document.createElement('button');
+                choice.type = 'button';
+                choice.className = 'choice w-full bg-[#2b2b2f] border border-white/5 rounded-xl p-4 flex items-center gap-4 text-left focus:outline-none focus:ring-2 focus:ring-[#ff3b3f]/40';
+                choice.innerHTML = `
+                    <div class=\"w-11 h-11 rounded-full bg-gradient-to-b from-[#ff6b6b] to-[#e23b3b] grid place-items-center font-bold\">${String.fromCharCode(65+i)}</div>
+                    <div class=\"flex-1 leading-snug\">${c}</div>
+                `;
+                const select = () => { answers[idx] = i; render(); };
+                choice.addEventListener('click', select);
+                choice.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); select(); }});
+                if(answers[idx] === i){ choice.classList.add('ring-2','ring-[#ff3b3f]/30'); }
+                choicesEl.appendChild(choice);
+            });
+
+            prevBtn.disabled = (idx===0);
+            prevBtn.classList.toggle('opacity-50', idx===0);
+            nextBtn.textContent = idx===quiz.length-1 ? 'Submit' : 'Next →';
+            nextBtn.disabled = (answers[idx] === null);
+            renderProgress();
+        }
+
+        prevBtn.addEventListener('click', ()=>{ if(idx>0){ idx--; render(); } });
+        nextBtn.addEventListener('click', ()=>{
+            if(idx < quiz.length-1){ idx++; render(); return; }
+            // Submit (store score + answers and go to results)
+            try{
+                const key = [3,3,0,2,2]; // d,d,a,c,c
+                const score = answers.reduce((acc,ans,i)=> acc + (ans===key[i]?1:0), 0);
+                localStorage.setItem('quiz4_answers', JSON.stringify(answers));
+                localStorage.setItem('quiz4_score', String(score));
+                localStorage.setItem('quiz4_total', String(quiz.length));
+            }catch(e){ console.warn('localStorage unavailable', e); }
+            window.location.href = 'results/quiz4-result.html';
+        });
+
+        render();
+    </script>
 </body>
 </html>
