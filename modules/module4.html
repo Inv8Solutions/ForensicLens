@@ -1,142 +1,263 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lighting Effects Simulation (Fake Demo)</title>
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    background: #f4f4f4;
-    margin: 0;
-    padding: 0;
-  }
-  h1 {
-    text-align: center;
-    padding: 20px;
-  }
-  .module {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-direction: column;
-    margin: 30px auto;
-    padding: 20px;
-    width: 80%;
-    max-width: 800px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-  }
-  canvas {
-    border: 1px solid #aaa;
-    border-radius: 8px;
-    margin: 15px 0;
-    cursor: pointer;
-  }
-  .desc {
-    max-width: 700px;
-    text-align: center;
-    font-size: 0.95em;
-    color: #444;
-  }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0" />
+  <title>Module 4: UV Light</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;400&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter','ui-sans-serif','system-ui'], heading: ['Montserrat','ui-sans-serif','system-ui'] },
+          colors: { bg: '#17171a', card: '#2f2f34', muted: '#b7b7bb' }
+        }
+      }
+    }
+  </script>
 </head>
 <body>
-<h1>Lighting Effects Simulation (Fake Demo)</h1>
+  <div class="min-h-dvh flex flex-col items-center bg-bg text-white font-sans">
+    <div class="w-full max-w-[420px] flex flex-col min-h-dvh px-4 sm:px-6 mt-[20px]">
+      <!-- top bar -->
+      <div class="flex items-center gap-2 justify-start mt-1 mb-3 sm:mb-5">
+        <button class="w-[40px] h-[40px] rounded-xl bg-[#1f1f23] border border-white/10 text-muted flex items-center justify-center" onclick="history.back()" aria-label="Back">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <div class="flex-1 text-center">
+          <p class="font-heading font-bold text-[18px] leading-tight m-0">Module 4</p>
+          <p class="font-semibold text-[#d9d9dc] text-[14px] mt-0.5">UV Light</p>
+        </div>
+        <div class="w-10"></div>
+      </div>
 
-<div class="module">
-  <h2>1. Oblique Lighting</h2>
-  <canvas id="oblique" width="400" height="200"></canvas>
-  <p class="desc">Oblique lighting highlights texture by casting long shadows from the side. Drag your mouse over the canvas to "move the light".</p>
-</div>
+      <main class="flex-1 space-y-4">
+        <!-- What is UV Light card -->
+        <section class="bg-[#3b3b41] border border-white/10 rounded-2xl p-5 shadow-[0_10px_30px_rgba(0,0,0,0.24)]" aria-label="What is UV Light?">
+          <h1 class="font-heading text-2xl font-extrabold mb-2">What is UV Light</h1>
+          <p class="text-[#e9e9ec] leading-relaxed text-sm">UV light is invisible to our eyes but reveals hidden details by making some substances glow.</p>
+        </section>
 
-<div class="module">
-  <h2>2. Diffused Lighting</h2>
-  <canvas id="diffused" width="400" height="200"></canvas>
-  <p class="desc">Diffused lighting spreads evenly, reducing shadows and flattening texture. Hover to see the effect soften.</p>
-</div>
+        <!-- Normal Light View card -->
+        <section class="bg-[#3b3b41] border border-white/10 rounded-2xl p-5 shadow-[0_10px_30px_rgba(0,0,0,0.24)]" aria-label="Normal Light View">
+          <div class="w-full flex flex-col items-center justify-center text-center">
+            <h2 class="font-heading text-lg font-extrabold">Normal Light View</h2>
+            <div class="mt-3 flex items-center gap-3">
+              <button id="toggleBtn" class="rounded-lg px-3 py-2 font-semibold bg-black/60 text-white hover:bg-black/70 border border-white/10">Toggle UV View</button>
+            </div>
+          </div>
 
-<div class="module">
-  <h2>3. Transmitted Lighting</h2>
-  <canvas id="transmitted" width="400" height="200"></canvas>
-  <p class="desc">Transmitted lighting passes through the object, emphasizing translucency (like a leaf). Click to toggle glow effect.</p>
-</div>
+          <div class="mt-4">
+            <div id="previewSurface" class="relative rounded-xl border border-white/10 bg-[#2a2a2f] h-[180px] overflow-hidden">
+              <!-- Glow overlay for UV -->
+              <div id="uvGlow" class="absolute inset-0 opacity-0 transition-opacity duration-300"></div>
+              <!-- Normal layer -->
+              <div id="normalLayer" class="absolute inset-0 grid place-items-center opacity-100 transition-opacity duration-300">
+                <div class="text-center">
+                  <div class="text-white/60 text-2xl"><i class="fa-regular fa-eye"></i></div>
+                  <div class="text-white/60 text-sm mt-1">Blank surface</div>
+                </div>
+              </div>
+              <!-- UV layer -->
+              <div id="uvLayer" class="absolute inset-0 flex flex-col items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+                <i class="fa-solid fa-bolt text-violet-300 text-xl" style="filter: drop-shadow(0 0 12px rgba(167,139,250,0.95));"></i>
+                <div class="mt-3 space-y-2">
+                  <div class="h-[10px] w-24 rounded-full border border-violet-300/70 bg-violet-400/20 shadow-[0_0_20px_4px_rgba(167,139,250,0.6)]"></div>
+                  <div class="h-[10px] w-36 rounded-full border border-violet-300/70 bg-violet-400/20 shadow-[0_0_24px_4px_rgba(167,139,250,0.7)]"></div>
+                  <div class="h-[10px] w-20 rounded-full border border-violet-300/70 bg-violet-400/20 shadow-[0_0_20px_4px_rgba(167,139,250,0.6)]"></div>
+                </div>
+                <div class="mt-3 text-violet-300 text-sm" style="text-shadow:0 0 14px rgba(167,139,250,0.9);">Glowing evidence</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
 
-<script>
-/* 1. Oblique Lighting (fake shadows moving with mouse) */
-const oblique = document.getElementById("oblique");
-const ctx1 = oblique.getContext("2d");
+      <!-- footer controls -->
+      <div class="mt-auto sticky bottom-4">
+        <div class="flex gap-3">
+          <button class="flex-1 rounded-xl py-3.5 px-5 font-bold text-white bg-gradient-to-b from-[#ff6b6b] to-[#e23b3b] shadow-[0_10px_24px_rgba(226,59,59,0.25)] active:translate-y-px" id="nextBtn">Next →</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-function drawOblique(x=50,y=50) {
-  ctx1.clearRect(0,0,oblique.width,oblique.height);
-  // Base object (fingerprint-like ellipse)
-  ctx1.fillStyle = "#999";
-  ctx1.beginPath();
-  ctx1.ellipse(200,100,80,50,0,0,Math.PI*2);
-  ctx1.fill();
+  <script>
+    (function(){
+  const toggleBtn = document.getElementById('toggleBtn');
+  const previewSurface = document.getElementById('previewSurface');
+  const uvGlow = document.getElementById('uvGlow');
+  const normalLayer = document.getElementById('normalLayer');
+  const uvLayer = document.getElementById('uvLayer');
+  const nextBtn = document.getElementById('nextBtn');
+  const mainEl = document.querySelector('main');
+   let step = 1;
+   let subStep = 1; // for mini guide in step 3
 
-  // Fake shadow that moves
-  ctx1.fillStyle = "rgba(0,0,0,0.3)";
-  ctx1.beginPath();
-  ctx1.ellipse(200+(x-200)/6,100+(y-100)/6,80,50,0,0,Math.PI*2);
-  ctx1.fill();
-}
-drawOblique();
+      let uv = false;
+      function render(){
+        if (!previewSurface || !uvGlow || !normalLayer || !uvLayer) return;
+        if (!uv){
+          // Normal view
+          uvGlow.style.background = 'transparent';
+          uvGlow.classList.remove('opacity-100');
+          uvGlow.classList.add('opacity-0');
+          uvLayer.classList.remove('opacity-100');
+          uvLayer.classList.add('opacity-0');
+          normalLayer.classList.remove('opacity-0');
+          normalLayer.classList.add('opacity-100');
+        } else {
+          // UV view with glowing evidence effect
+          uvGlow.style.background = 'radial-gradient(circle at 50% 50%, rgba(167,139,250,0.45) 0%, rgba(167,139,250,0.25) 38%, rgba(167,139,250,0.12) 58%, rgba(0,0,0,0) 80%)';
+          uvGlow.classList.remove('opacity-0');
+          uvGlow.classList.add('opacity-100');
+          uvLayer.classList.remove('opacity-0');
+          uvLayer.classList.add('opacity-100');
+          normalLayer.classList.remove('opacity-100');
+          normalLayer.classList.add('opacity-0');
+        }
+      }
 
-oblique.addEventListener("mousemove", e => {
-  const rect = oblique.getBoundingClientRect();
-  drawOblique(e.clientX-rect.left,e.clientY-rect.top);
-});
+      if (toggleBtn) toggleBtn.addEventListener('click', ()=>{ uv = !uv; render(); });
+      function renderMiniGuide(){
+        if (!mainEl) return;
+        // hide sticky footer Next during mini guide
+        if (nextBtn) nextBtn.classList.add('hidden');
 
-/* 2. Diffused Lighting (soft blur effect) */
-const diffused = document.getElementById("diffused");
-const ctx2 = diffused.getContext("2d");
+        const dots = Array.from({length:5}).map((_,i)=>
+          `<span class="w-2 h-2 rounded-full ${i+1===subStep?'bg-violet-500':'bg-white/20'}"></span>`
+        ).join('');
 
-function drawDiffused(soft=false) {
-  ctx2.clearRect(0,0,diffused.width,diffused.height);
-  let gradient = ctx2.createRadialGradient(200,100,soft?150:60,200,100,200);
-  gradient.addColorStop(0, soft ? "#bbb" : "#999");
-  gradient.addColorStop(1, "#eee");
-  ctx2.fillStyle = gradient;
-  ctx2.beginPath();
-  ctx2.arc(200,100,70,0,Math.PI*2);
-  ctx2.fill();
-}
-drawDiffused();
+        function miniCard(){
+          if (subStep === 1){
+            return `
+              <div class="text-white/90 text-sm font-semibold">1</div>
+              <div class="mx-auto my-3 text-violet-400 text-4xl"><i class="fa-solid fa-moon"></i></div>
+              <h3 class="font-heading text-lg font-extrabold">Darken the Environment</h3>
+              <p class="text-white/70 text-sm">Remove background light sources</p>
+            `;
+          } else if (subStep === 2){
+            return `
+              <div class="text-white/90 text-sm font-semibold">2</div>
+              <div class="mx-auto my-3 text-violet-400 text-4xl"><i class="fa-solid fa-bolt"></i></div>
+              <h3 class="font-heading text-lg font-extrabold">Shine UV Light at Evidence</h3>
+              <p class="text-white/70 text-sm">Experiment with different angles</p>
+            `;
+          } else if (subStep === 3){
+            return `
+              <div class="text-white/90 text-sm font-semibold">3</div>
+              <div class="mx-auto my-3 text-violet-400 text-4xl"><i class="fa-solid fa-camera"></i></div>
+              <h3 class="font-heading text-lg font-extrabold">Mount Camera on Tripod</h3>
+              <p class="text-white/70 text-sm">Prevent blur during long exposures</p>
+            `;
+          } else if (subStep === 4){
+            return `
+              <div class="text-white/90 text-sm font-semibold">4</div>
+              <div class="mx-auto my-3 text-violet-400 text-4xl"><i class="fa-solid fa-filter"></i></div>
+              <h3 class="font-heading text-lg font-extrabold">Attach UV/Barrier Filter</h3>
+              <p class="text-white/70 text-sm">Capture only fluorescence</p>
+            `;
+          }
+          return `
+            <div class="text-white/90 text-sm font-semibold">5</div>
+            <div class="mx-auto my-3 text-violet-400 text-4xl"><i class="fa-solid fa-earth-americas"></i></div>
+            <h3 class="font-heading text-lg font-extrabold">Take Multiple Shots</h3>
+            <p class="text-white/70 text-sm">Adjust exposure for clarity</p>
+          `;
+        }
 
-diffused.addEventListener("mouseenter", ()=>drawDiffused(true));
-diffused.addEventListener("mouseleave", ()=>drawDiffused(false));
+        mainEl.innerHTML = `
+          <section class="text-center mb-4">
+            <h1 class="font-heading font-extrabold text-2xl leading-tight">How to Apply UV Light</h1>
+            <div class="mt-2 text-white font-bold">3</div>
+            <p class="text-white/70 text-sm mt-1">Step-by-step technique guide</p>
+            <div class="flex justify-center gap-2 mt-2">${dots}</div>
+          </section>
 
-/* 3. Transmitted Lighting (fake glow toggle) */
-const transmitted = document.getElementById("transmitted");
-const ctx3 = transmitted.getContext("2d");
-let glow = false;
+          <section class="bg-[#2b2b30] border border-white/10 rounded-2xl p-6 mt-10 py-20 mx-auto text-center shadow-[0_10px_30px_rgba(106,33,255,0.25)] ring-1 ring-violet-500/30">
+            ${miniCard()}
+          </section>
+          <div class="mt-10 space-y-4">
+            <div class="mt-10 flex items-center justify-center gap-2">
+              <button id="miniPrev" class="rounded-lg px-3 py-2 font-semibold text-white/90 border border-white/15 bg-white/5">&lt;</button>
+              <button id="miniNext" class="rounded-lg px-3 py-2 font-semibold text-white/90 border border-white/15 bg-white/5">&gt;</button>
+            </div>
+            <div class="mt-10 flex items-center justify-between">
+              <button id="miniBack" class="rounded-xl py-2.5 px-4 font-semibold text-white/90 border border-white/15 bg-white/5">Back</button>
+              <button id="miniPractice" class="rounded-xl py-2.5 px-4 font-bold text-white bg-gradient-to-b from-[#ff6b6b] to-[#e23b3b]">Next: Practice →</button>
+            </div>  
+          </div>
+        `;
 
-function drawTransmitted() {
-  ctx3.clearRect(0,0,transmitted.width,transmitted.height);
-  ctx3.fillStyle = glow ? "rgba(0,200,0,0.6)" : "#2a5";
-  ctx3.beginPath();
-  ctx3.moveTo(200,50);
-  ctx3.lineTo(250,100);
-  ctx3.lineTo(200,150);
-  ctx3.lineTo(150,100);
-  ctx3.closePath();
-  ctx3.fill();
+        // wire mini controls
+        const prev = document.getElementById('miniPrev');
+        const next = document.getElementById('miniNext');
+        const back = document.getElementById('miniBack');
+        const practiceBtn = document.getElementById('miniPractice');
 
-  if (glow) {
-    ctx3.shadowColor = "rgba(0,255,0,0.6)";
-    ctx3.shadowBlur = 30;
-    ctx3.fill();
-    ctx3.shadowBlur = 0;
-  }
-}
-drawTransmitted();
+        prev.addEventListener('click', ()=>{ if (subStep>1){ subStep--; renderMiniGuide(); } });
+        next.addEventListener('click', ()=>{ if (subStep<5){ subStep++; renderMiniGuide(); } });
+  back.addEventListener('click', ()=>{ step = 2; subStep = 1; if (nextBtn) nextBtn.classList.remove('hidden'); renderUseCases(); });
+        practiceBtn.addEventListener('click', ()=>{
+          if (subStep < 5){ subStep++; renderMiniGuide(); return; }
+          // navigate to practice levels or next part
+          window.location.href = '../practice-levels.html';
+        });
+      }
 
-transmitted.addEventListener("click", ()=>{
-  glow = !glow;
-  drawTransmitted();
-});
-</script>
+      function renderUseCases(){
+        if (!mainEl) return;
+        if (nextBtn) nextBtn.classList.remove('hidden');
+        mainEl.innerHTML = `
+          <section class="bg-[#3b3b41] border border-white/10 rounded-2xl p-4 shadow-[0_10px_30px_rgba(0,0,0,0.24)]">
+            <h2 class="font-heading text-xl font-extrabold">Forensic Use Cases</h2>
+          </section>
+
+          <section class="grid grid-cols-2 gap-3 mt-1">
+            <div class="bg-[#3b3b41] border border-white/10 rounded-2xl p-4 text-center">
+              <div class="text-[#ff3b3f] text-4xl mb-2"><i class="fa-solid fa-fingerprint"></i></div>
+              <div class="font-semibold">Fingerprints</div>
+              <div class="text-white/60 text-xs">Latent fingerprints<br/>(after treatment)</div>
+            </div>
+            <div class="bg-[#3b3b41] border border-white/10 rounded-2xl p-4 text-center">
+              <div class="text-[#ff3b3f] text-4xl mb-2"><i class="fa-solid fa-droplet"></i></div>
+              <div class="font-semibold">Biological Fluids</div>
+              <div class="text-white/60 text-xs">Blood, semen,<br/>saliva</div>
+            </div>
+            <div class="bg-[#3b3b41] border border-white/10 rounded-2xl p-4 text-center">
+              <div class="text-[#ff3b3f] text-4xl mb-2"><i class="fa-solid fa-person"></i></div>
+              <div class="font-semibold">Injuries</div>
+              <div class="text-white/60 text-xs">Bruises bite marks<br/>under skin</div>
+            </div>
+            <div class="bg-[#3b3b41] border border-white/10 rounded-2xl p-4 text-center">
+              <div class="text-[#ff3b3f] text-4xl mb-2"><i class="fa-solid fa-feather"></i></div>
+              <div class="font-semibold">Fibers & Hairs</div>
+              <div class="text-white/60 text-xs">Materials that<br/>fluoresce</div>
+            </div>
+            <div class="bg-[#3b3b41] border border-white/10 rounded-2xl p-4 text-center col-span-2">
+              <div class="text-[#ff3b3f] text-4xl mb-2"><i class="fa-solid fa-file-lines"></i></div>
+              <div class="font-semibold">Documents</div>
+              <div class="text-white/60 text-xs">Altered/ forged<br/>documents</div>
+            </div>
+          </section>
+        `;
+      }
+
+      if (nextBtn){
+        nextBtn.addEventListener('click', ()=>{
+          if (step === 1){
+            step = 2; renderUseCases();
+          } else if (step === 2){
+            step = 3; renderMiniGuide();
+          }
+        });
+      }
+      render();
+
+      
+    })();
+  </script>
 </body>
 </html>
