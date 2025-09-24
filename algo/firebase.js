@@ -4,7 +4,7 @@
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js';
 import { getAnalytics } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-analytics.js';
-import { getAuth, onAuthStateChanged, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';
+import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';
 import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -27,17 +27,48 @@ try {
   console.warn('Firebase init failed', e);
 }
 
-const state = { uid: null };
+const state = { uid: null, listeners: new Set() };
+
+// Helper: get custom token from URL if provided (fbct or customToken)
+function getTokenFromUrl(){
+  try{
+    const qs = new URLSearchParams(window.location.search || '');
+    return qs.get('fbct') || qs.get('customToken') || null;
+  }catch(e){ return null; }
+}
+
+// Attempt initial sign-in: prefer custom token if available, else anonymous
+async function bootstrapAuth(){
+  if(!auth) return false;
+  const token = getTokenFromUrl();
+  if(token){
+    try{ await signInWithCustomToken(auth, token); return true; }
+    catch(e){ console.warn('Custom token sign-in failed, falling back to anon', e); }
+  }
+  try{ await signInAnonymously(auth); return true; }
+  catch(e){ console.warn('Anon auth error', e); return false; }
+}
+
 const ready = new Promise((resolve) => {
   if (!auth) { resolve(false); return; }
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     if (user) {
       state.uid = user.uid;
+      try{
+        // Load and restore progress automatically on auth changes
+        const progress = await loadProgress();
+        if(progress && window.ForensicFlow && typeof window.ForensicFlow.restore === 'function'){
+          window.ForensicFlow.restore(progress);
+        }
+        // Notify listeners/subscribers
+        try{ window.dispatchEvent(new CustomEvent('forensic-auth', { detail: { uid: user.uid } })); }catch(_){}
+        try{ if(progress) window.dispatchEvent(new CustomEvent('forensic-progress-restored', { detail: { uid: user.uid, progress } })); }catch(_){}
+      }catch(e){ /* ignore */ }
       resolve(true);
     }
   });
-  // Kick off anonymous auth if not signed in
-  signInAnonymously(auth).catch((e) => console.warn('Anon auth error', e));
+  // kick off first sign-in attempt
+  bootstrapAuth();
 });
 
 async function saveProgress(progress) {
@@ -72,5 +103,30 @@ window.ForensicCloud = {
   getUid: () => state.uid,
   saveProgress,
   loadProgress,
+  // Sign in with a Firebase custom token provided by native app
+  signInWithCustomToken: async (token) => {
+    try {
+      if(!auth) return false;
+      await signInWithCustomToken(auth, token);
+      return true;
+    } catch (e) {
+      console.warn('signInWithCustomToken failed', e); return false;
+    }
+  },
+  // Subscribe to auth changes (simple callback registry)
+  onAuth: (fn) => { if(typeof fn==='function') state.listeners.add(fn); return () => state.listeners.delete(fn); },
   _ready: ready
 };
+
+// Also accept custom token via postMessage from Android WebView
+try{
+  window.addEventListener('message', async (evt)=>{
+    try{
+      const data = evt?.data;
+      if(data && (data.type === 'FORNS_CLD_CUSTOM_TOKEN' || data.type === 'FIREBASE_CUSTOM_TOKEN')){
+        const token = data.token;
+        if(token){ await window.ForensicCloud.signInWithCustomToken(token); }
+      }
+    }catch(e){ /* ignore */ }
+  });
+}catch(e){ /* ignore */ }
