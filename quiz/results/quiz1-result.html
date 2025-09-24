@@ -24,12 +24,20 @@
     /* Back button matching other pages */
     .back{background:var(--card);border-radius:12px;border:2px solid var(--card-border);width:56px;height:56px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
     .helper{color:var(--muted);font-size:13px;margin-top:6px}
+
+    /* Modal styles */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:2000;padding:16px}
+    .modal.show{display:flex}
+    .modal-card{background:var(--card);border:2px solid var(--card-border);border-radius:16px;max-width:520px;width:100%;padding:20px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.5)}
+    .modal-title{font-size:20px;font-weight:700;margin-bottom:6px}
+    .modal-sub{color:var(--muted);margin-bottom:14px}
+    .modal-actions{margin-top:18px;display:flex;flex-direction:column;gap:12px}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div style="display:flex;justify-content:flex-start;margin-bottom:18px">
-      <button class="back" onclick="window.location.href='index.html'" aria-label="Back">◀</button>
+      <button class="back" onclick="window.location.href='../../index.html'" aria-label="Back">◀</button>
     </div>
 
     <div class="card">
@@ -52,6 +60,23 @@
     </div>
   </div>
 
+  <!-- Score Modal -->
+  <div id="resultModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <div id="modalTitle" class="modal-title">Your Score</div>
+      <div id="modalSubtitle" class="modal-sub">Results summary</div>
+      <div class="score-grid" style="justify-content:center">
+        <div class="score-item"><div style="color:var(--muted);font-size:12px">Overall Score</div><div class="score-big" id="modalPct">0%</div></div>
+        <div class="score-item"><div style="color:var(--muted);font-size:12px">Correct Answers</div><div class="score-big" id="modalCorrect">0/5</div></div>
+      </div>
+      <div class="modal-actions">
+        <button id="modalProceed" class="btn primary" style="display:none">Continue to Module 2 →</button>
+        <button id="modalRetake" class="btn ghost" style="display:none">⟲ Retake Quiz</button>
+        <button id="modalClose" class="btn ghost">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const answers = JSON.parse(localStorage.getItem('quiz1_answers') || '[]');
     const quiz = [0,2,1,3,0]; // correct indices for quiz 1 (a=0,c=2,b=1,d=3,a=0)
@@ -63,10 +88,16 @@
     document.getElementById('pct').textContent = pct + '%';
     document.getElementById('correctCount').textContent = `${correct}/${quiz.length}`;
 
+    // Persist score/pass flags for consistency with progression engine
+    try{
+      localStorage.setItem('quiz1_score', String(correct));
+      localStorage.setItem('quiz1_total', String(quiz.length));
+      localStorage.setItem('quiz1_pass', String(correct >= 4));
+    }catch(e){ /* ignore */ }
+
     const nextBtn = document.getElementById('nextModule');
     const lockHelper = document.getElementById('lockHelper');
     if(correct < 4){
-      // lock next module
       nextBtn.disabled = true;
       lockHelper.style.display = 'block';
     } else {
@@ -74,13 +105,50 @@
       lockHelper.style.display = 'none';
     }
 
+    // Modal wiring
+    const modal = document.getElementById('resultModal');
+    const modalPct = document.getElementById('modalPct');
+    const modalCorrect = document.getElementById('modalCorrect');
+    const modalSubtitle = document.getElementById('modalSubtitle');
+    const modalProceed = document.getElementById('modalProceed');
+    const modalRetake = document.getElementById('modalRetake');
+    const modalClose = document.getElementById('modalClose');
+
+    modalPct.textContent = pct + '%';
+    modalCorrect.textContent = `${correct}/${quiz.length}`;
+    modalSubtitle.textContent = correct >= 4 ? 'Great job! You passed.' : 'You need at least 4/5 to pass.';
+
+    // Show appropriate primary action
+    if(correct >= 4){
+      modalProceed.style.display = 'block';
+      modalRetake.style.display = 'none';
+    } else {
+      modalProceed.style.display = 'none';
+      modalRetake.style.display = 'block';
+    }
+
+    // Open modal on load
+    modal.classList.add('show');
+
     document.getElementById('retake').addEventListener('click', ()=>{
       localStorage.removeItem('quiz1_answers');
       window.location.href = '../quiz1.html';
     });
     nextBtn.addEventListener('click', ()=>{
-      // navigate to next module or training modules - defaulting to training modules page
-      window.location.href = '../../training-modules.html';
+      // Explicit next navigation to Module 2
+      window.location.href = '../../modules/module2.html';
+    });
+
+    // Modal actions
+    modalProceed.addEventListener('click', ()=>{
+      window.location.href = '../../modules/module2.html';
+    });
+    modalRetake.addEventListener('click', ()=>{
+      localStorage.removeItem('quiz1_answers');
+      window.location.href = '../quiz1.html';
+    });
+    modalClose.addEventListener('click', ()=>{
+      modal.classList.remove('show');
     });
   </script>
 </body>
