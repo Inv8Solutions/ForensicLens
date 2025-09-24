@@ -71,46 +71,72 @@
     isPracticeDone(n){ return LS.bool(`practice${n}_done`); },
     quizPass(n){ return LS.get(`quiz${n}_pass`)==='true'; },
 
-    // Gating for Practice Levels screen
+    // Gating for Practice Levels screen (unlock level N when Module N is done)
     applyPracticeLocks(root=document){
-      const m1 = Progress.isModuleDone(1);
       const cards = root.querySelectorAll('.level-card');
       cards.forEach((card, i)=>{
         const level = i+1;
         const action = card.querySelector('.level-action');
-        const go = action && action.querySelector('a.go-btn');
-        const lock = action && action.querySelector('.lock');
+        if(!action) return;
+        const go = action.querySelector('a.go-btn');
+        const lock = action.querySelector('.lock');
+        const canStart = Progress.isModuleDone(level);
 
-        if(!m1){
-          // Module 1 not finished: gray out ALL levels and lock them
-          if(go) go.replaceWith(createLock());
-          card.style.opacity = 0.5;
-          return;
-        }
-
-        // Module 1 finished: unlock ONLY Level 1; keep others as-is
-        if(level === 1){
-          if(lock && !go){ lock.replaceWith(createGo(level)); }
+        if(canStart){
+          // ensure a Go button exists
+          if(!go){
+            const link = document.createElement('a');
+            link.className = 'go-btn';
+            link.setAttribute('aria-label', `Start Level ${level}`);
+            link.href = `./levels/level${level}.html`;
+            link.innerHTML = '<span style="font-size:1.5rem;">&#8594;</span>';
+            if(lock) lock.replaceWith(link); else action.appendChild(link);
+          }
           card.style.opacity = 1;
         } else {
-          card.style.opacity = '';
+          // ensure a Lock is shown
+          if(go){
+            const span = document.createElement('span');
+            span.className = 'lock';
+            span.innerHTML = '<svg viewBox="0 0 20 20"><path d="M5 8V6a5 5 0 0 1 10 0v2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2zm2-2a3 3 0 1 1 6 0v2H7V6zm-2 4v6h10v-6H5z"/></svg>Locked';
+            go.replaceWith(span);
+          }
+          card.style.opacity = 0.5;
         }
       });
+    },
 
-      function createLock(){
-        const span = document.createElement('span');
-        span.className = 'lock';
-        span.innerHTML = '<svg viewBox="0 0 20 20"><path d="M5 8V6a5 5 0 0 1 10 0v2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2zm2-2a3 3 0 1 1 6 0v2H7V6zm-2 4v6h10v-6H5z"/></svg>Locked';
-        return span;
-      }
-      function createGo(level){
-        const link = document.createElement('a');
-        link.className = 'go-btn';
-        link.setAttribute('aria-label', `Start Level ${level}`);
-        link.href = `./levels/level${level}.html`;
-        link.innerHTML = '<span style="font-size:1.5rem;">&#8594;</span>';
-        return link;
-      }
+    // Gating for Training Modules screen (unlock module N when Quiz N-1 passed)
+    applyModuleLocks(root=document){
+      const cards = root.querySelectorAll('.module-card');
+      cards.forEach((card, i)=>{
+        const mod = i+1;
+        const action = card.querySelector('.module-action');
+        if(!action) return;
+        const go = action.querySelector('a.go-btn');
+        const lock = action.querySelector('.lock');
+        const canStart = (mod === 1) || Progress.quizPass(mod-1);
+
+        if(canStart){
+          if(!go){
+            const link = document.createElement('a');
+            link.className = 'go-btn';
+            link.setAttribute('aria-label', `Start Module ${mod}`);
+            link.href = `./modules/module${mod}.html`;
+            link.innerHTML = '<span style="font-size:1.5rem;">&#8594;</span>';
+            if(lock) lock.replaceWith(link); else action.appendChild(link);
+          }
+          card.style.opacity = 1;
+        } else {
+          if(go){
+            const span = document.createElement('span');
+            span.className = 'lock';
+            span.innerHTML = '<svg viewBox="0 0 20 20"><path d="M5 8V6a5 5 0 0 1 10 0v2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2zm2-2a3 3 0 1 1 6 0v2H7V6zm-2 4v6h10v-6H5z"/></svg>Locked';
+            go.replaceWith(span);
+          }
+          card.style.opacity = 0.5;
+        }
+      });
     },
 
     // Flow helpers
@@ -156,5 +182,37 @@
         if(remote){ Progress.restore(remote); }
       }
     }catch(e){ /* ignore hydration errors */ }
+
+    // After hydration, enforce page order if user deep-links into a locked page
+    try{
+      const p = location.pathname || '';
+      const modMatch = p.match(/\/(modules)\/module(\d+)\.html$/);
+      const lvlMatch = p.match(/\/(levels)\/level(\d+)\.html$/);
+      const quizMatch = p.match(/\/(quiz)\/quiz(\d+)\.html$/);
+
+      function computeNextRoute(){
+        for(let i=1;i<=4;i++){
+          if(!Progress.isModuleDone(i)) return `modules/module${i}.html`;
+          if(!Progress.isPracticeDone(i)) return `levels/level${i}.html`;
+          if(!Progress.quizPass(i)) return `quiz/quiz${i}.html`;
+        }
+        return 'training-modules.html';
+      }
+
+      // Guard logic per page kind
+      if(modMatch){
+        const n = parseInt(modMatch[2],10);
+        const allowed = (n===1) || Progress.quizPass(n-1);
+        if(!allowed){ goRoot(computeNextRoute()); return; }
+      } else if(lvlMatch){
+        const n = parseInt(lvlMatch[2],10);
+        const allowed = Progress.isModuleDone(n);
+        if(!allowed){ goRoot(computeNextRoute()); return; }
+      } else if(quizMatch){
+        const n = parseInt(quizMatch[2],10);
+        const allowed = Progress.isPracticeDone(n);
+        if(!allowed){ goRoot(computeNextRoute()); return; }
+      }
+    }catch(e){ /* ignore guard errors */ }
   })();
 })();

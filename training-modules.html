@@ -261,3 +261,11 @@
   </div>
 </body>
 </html>
+<script type="module" src="./algo/firebase.js"></script>
+<script src="./algo/algo.js"></script>
+<script>
+  (function(){
+    function apply(){ if(window.ForensicFlow && typeof ForensicFlow.applyModuleLocks==='function'){ ForensicFlow.applyModuleLocks(document); } }
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply); else apply();
+  })();
+  </script>
