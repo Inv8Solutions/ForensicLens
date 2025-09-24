@@ -75,7 +75,7 @@
     <body>
         <div id="main-content" class="container">
         <div class="header">
-            <button class="back" onclick="window.location.href='index.html'" aria-label="Back">◀</button>
+            <button class="back" onclick="window.location.href='../index.html'" aria-label="Back">◀</button>
             <div class="title">Module 2: Parts of the Camera</div>
         </div>
 
@@ -138,6 +138,10 @@
             </aside>
         </div>
     </div>
+
+    <!-- Cloud progress (Firebase) and progression engine -->
+    <script type="module" src="../algo/firebase.js"></script>
+    <script src="../algo/algo.js"></script>
 
     <script>
         // Two-step navigation: first click -> load next card (Aperture). Second click -> go to quiz.
@@ -276,7 +280,7 @@
             if (overlayPs && overlayPs.length >= 2) overlayPs[1].textContent = '4/4';
 
             content.insertBefore(winEl, content.firstChild);
-            btn.textContent = 'Take the Quiz →';
+            btn.textContent = 'Go To Practice →';
         }
 
         btn.addEventListener('click', ()=>{
@@ -290,8 +294,13 @@
                 loadWindowAnalogyCard();
                 step = 4;
             } else {
-                // final click: navigate to quiz
-                window.location.href = '../quiz/quiz2.html';
+                // final click: finish Module 2 then go to Practice Level 2
+                if (window.ForensicFlow && typeof ForensicFlow.onModule2Finished === 'function'){
+                    ForensicFlow.onModule2Finished();
+                } else {
+                    try{ localStorage.setItem('module2_done','true'); }catch(e){}
+                    window.location.href = '../levels/level2.html';
+                }
             }
         });
     })();

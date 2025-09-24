@@ -24,6 +24,8 @@
     .back{background:var(--card);border-radius:12px;border:2px solid var(--card-border);width:56px;height:56px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
     .helper{color:var(--muted);font-size:13px;margin-top:6px}
   </style>
+  <script type="module" src="../../algo/firebase.js"></script>
+  <script src="../../algo/algo.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -62,12 +64,22 @@
     document.getElementById('pct').textContent = pct + '%';
     document.getElementById('correctCount').textContent = `${correct}/${quiz.length}`;
 
+    // Persist score/pass and sync to cloud if available (no auto-redirect here)
+    try{
+      localStorage.setItem('quiz2_score', String(correct));
+      localStorage.setItem('quiz2_total', String(quiz.length));
+      localStorage.setItem('quiz2_pass', String(correct >= 4));
+      if(window.ForensicCloud && window.ForensicFlow && typeof ForensicFlow.snapshot === 'function'){
+        window.ForensicCloud.saveProgress(ForensicFlow.snapshot());
+      }
+    }catch(e){}
+
     const nextBtn = document.getElementById('nextModule');
     const lockHelper = document.getElementById('lockHelper');
     if(correct < 4){ nextBtn.disabled = true; lockHelper.style.display = 'block'; } else { nextBtn.disabled = false; lockHelper.style.display = 'none'; }
 
-    document.getElementById('retake').addEventListener('click', ()=>{ localStorage.removeItem('quiz2_answers'); window.location.href = '../quiz2-questions.html'; });
-    nextBtn.addEventListener('click', ()=>{ window.location.href = '../../training-modules.html'; });
+    document.getElementById('retake').addEventListener('click', ()=>{ localStorage.removeItem('quiz2_answers'); window.location.href = '../quiz2.html'; });
+    nextBtn.addEventListener('click', ()=>{ window.location.href = '../../modules/module3.html'; });
   </script>
 </body>
 </html>

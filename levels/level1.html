@@ -3,7 +3,6 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0">
 	<title>Level 1: Gun</title>
 	<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;400&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
 	<style>
@@ -384,6 +383,9 @@
 				.flash-toggle.off { background: linear-gradient(90deg,#ff9b9b,#ff4f4f); color:#330606; box-shadow:0 6px 18px rgba(255,79,79,0.10); }
 				.flash-toggle.off .indicator { background: #330606; border-color: #5a0b0b; }
 			</style>
+    <script type="module" src="../algo/firebase.js"></script>
+    <script src="../algo/algo.js"></script>
+
 	<script>
 			// Simple toast for submit feedback
 			function showToast(msg) {
@@ -410,7 +412,6 @@
 			document.addEventListener('DOMContentLoaded', ()=>{
 				// wire modal action buttons
 				document.getElementById('fl-try').addEventListener('click', ()=>{ closeResultModal(); });
-				document.getElementById('fl-next').addEventListener('click', ()=>{ window.location.href = '../practice-levels.html'; });
 
 				// Image render pipeline (real-time)
 				const img = document.getElementById('source-image');
@@ -500,6 +501,17 @@
 					-1, 1, 0, 1,
 					1, 1, 1, 1
 				]);
+
+				// Hook next to mark practice done and go to quiz via engine
+				document.getElementById('fl-next').addEventListener('click', (e)=>{
+					e.preventDefault();
+					if(window.ForensicFlow && typeof ForensicFlow.onPractice1Finished === 'function'){
+						ForensicFlow.onPractice1Finished();
+					} else {
+						try{ localStorage.setItem('practice1_done','true'); }catch(err){}
+						window.location.href = '../quiz/quiz1.html';
+					}
+				});
 
 				function setupQuad(){
 					const vao = gl.createVertexArray(); gl.bindVertexArray(vao);

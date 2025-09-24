@@ -23,6 +23,8 @@
     .back{background:var(--card);border-radius:12px;border:2px solid var(--card-border);width:56px;height:56px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
     .helper{color:var(--muted);font-size:13px;margin-top:6px}
   </style>
+  <script type="module" src="../../algo/firebase.js"></script>
+  <script src="../../algo/algo.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -63,6 +65,13 @@
         total = key.length;
       }
     }catch(e){ console.warn('localStorage unavailable', e); }
+
+    // Persist pass flag to localStorage for consistency and allow cloud sync by engine if loaded
+    try{
+      localStorage.setItem('quiz4_score', String(score));
+      localStorage.setItem('quiz4_total', String(total));
+      localStorage.setItem('quiz4_pass', String(score >= 4));
+    }catch(e){}
 
     const pct = Math.round((score/total)*100);
     document.getElementById('pct').textContent = pct + '%';

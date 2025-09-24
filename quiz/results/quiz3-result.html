@@ -24,11 +24,13 @@
     .back{background:var(--card);border-radius:12px;border:2px solid var(--card-border);width:56px;height:56px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
     .helper{color:var(--muted);font-size:13px;margin-top:6px}
   </style>
+  <script type="module" src="../../algo/firebase.js"></script>
+  <script src="../../algo/algo.js"></script>
 </head>
 <body>
   <div class="wrap">
     <div style="display:flex;justify-content:flex-start;margin-bottom:18px">
-      <button class="back" onclick="history.back()" aria-label="Back">◀</button>
+      <button class="back" onclick="window.location.href='index.html'" aria-label="Back">◀</button>
     </div>
 
     <div class="card">
@@ -66,6 +68,13 @@
       }
     }catch(e){ console.warn('localStorage unavailable', e); }
 
+    // Persist pass flag if engine isn't called elsewhere
+    try{
+      localStorage.setItem('quiz3_score', String(score));
+      localStorage.setItem('quiz3_total', String(total));
+      localStorage.setItem('quiz3_pass', String(score >= 4));
+    }catch(e){}
+
     const pct = Math.round((score/total)*100);
     document.getElementById('pct').textContent = pct + '%';
     document.getElementById('correctCount').textContent = `${score}/${total}`;
@@ -78,7 +87,7 @@
       localStorage.removeItem('quiz3_answers');
       window.location.href = '../quiz3.html';
     });
-    nextBtn.addEventListener('click', ()=>{ window.location.href = '../../training-modules.html'; });
+    nextBtn.addEventListener('click', ()=>{ window.location.href = '../../modules/module4.html'; });
   </script>
 </body>
 </html>

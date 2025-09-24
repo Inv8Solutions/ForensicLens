@@ -18,6 +18,8 @@
                 }
             }
         </script>
+        <script type="module" src="../algo/firebase.js"></script>
+        <script src="../algo/algo.js"></script>
     </head>
     <body>
         <div class="min-h-dvh flex flex-col items-center bg-bg text-white font-sans">
@@ -248,8 +250,13 @@
                         }
                     }
                 } else {
-                    // exit practice
-                    window.location.href = '../practice-levels.html';
+                    // exit practice -> mark module 3 done and go to Level 3
+                    if(window.ForensicFlow && typeof ForensicFlow.onModule3Finished === 'function'){
+                        ForensicFlow.onModule3Finished();
+                    } else {
+                        try{ localStorage.setItem('module3_done','true'); }catch(e){}
+                        window.location.href = '../levels/level3.html';
+                    }
                 }
             });
 

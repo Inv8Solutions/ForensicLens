@@ -33,6 +33,8 @@
     .modal-sub{color:var(--muted);margin-bottom:14px}
     .modal-actions{margin-top:18px;display:flex;flex-direction:column;gap:12px}
   </style>
+  <script type="module" src="../../algo/firebase.js"></script>
+  <script src="../../algo/algo.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -93,6 +95,10 @@
       localStorage.setItem('quiz1_score', String(correct));
       localStorage.setItem('quiz1_total', String(quiz.length));
       localStorage.setItem('quiz1_pass', String(correct >= 4));
+      // Sync to cloud if available
+      if(window.ForensicCloud && window.ForensicFlow && typeof ForensicFlow.snapshot === 'function'){
+        window.ForensicCloud.saveProgress(ForensicFlow.snapshot());
+      }
     }catch(e){ /* ignore */ }
 
     const nextBtn = document.getElementById('nextModule');

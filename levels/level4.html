@@ -403,6 +403,8 @@
 					box-shadow: 0 6px 16px rgba(42,209,209,0.12);
 				}
 			</style>
+	    <script type="module" src="../algo/firebase.js"></script>
+	    <script src="../algo/algo.js"></script>
 	<script>
 			// Simple toast for submit feedback
 			function showToast(msg) {
@@ -464,7 +466,15 @@
 			document.addEventListener('DOMContentLoaded', ()=>{
 				// wire modal action buttons
 				document.getElementById('fl-try').addEventListener('click', ()=>{ closeResultModal(); });
-				document.getElementById('fl-next').addEventListener('click', ()=>{ window.location.href = '../practice-levels.html'; });
+				document.getElementById('fl-next').addEventListener('click', (e)=>{
+					try{ e.preventDefault(); }catch(_){ }
+					if(window.ForensicFlow && typeof ForensicFlow.onPractice4Finished === 'function'){
+						ForensicFlow.onPractice4Finished();
+					} else {
+						try{ localStorage.setItem('practice4_done','true'); }catch(err){}
+						window.location.href = '../quiz/quiz4.html';
+					}
+				});
 
 				// Image render pipeline (real-time)
 				const img = document.getElementById('source-image');
@@ -1197,7 +1207,15 @@
 					});
 				}
 			document.getElementById('fl-try').addEventListener('click', ()=>{ closeResultModal(); });
-			document.getElementById('fl-next').addEventListener('click', ()=>{ window.location.href = '../practice-levels.html'; });
+			document.getElementById('fl-next').addEventListener('click', (e)=>{
+				try{ e.preventDefault(); }catch(_){ }
+				if(window.ForensicFlow && typeof ForensicFlow.onPractice4Finished === 'function'){
+					ForensicFlow.onPractice4Finished();
+				} else {
+					try{ localStorage.setItem('practice4_done','true'); }catch(err){}
+					window.location.href = '../quiz/quiz4.html';
+				}
+			});
 		});
 	</script>
 	<div class="top-bar">

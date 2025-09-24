@@ -45,10 +45,26 @@
 
   // API exposed on window
   const Progress = {
+    // Take a snapshot of relevant keys for cloud sync
+    snapshot(){
+      const keys = [
+        'module1_done','module2_done','module3_done','module4_done',
+        'practice1_done','practice2_done','practice3_done','practice4_done',
+        'quiz1_score','quiz1_total','quiz1_pass',
+        'quiz2_score','quiz2_total','quiz2_pass',
+        'quiz3_score','quiz3_total','quiz3_pass',
+        'quiz4_score','quiz4_total','quiz4_pass'
+      ];
+      const out = {};
+      keys.forEach(k=>{ const v = LS.get(k); if(v!==null && v!==undefined) out[k]=v; });
+      return out;
+    },
+    // Restore a snapshot into localStorage
+    restore(data){ if(!data) return; Object.entries(data).forEach(([k,v])=> LS.set(k,v)); },
     // Markers
-    markModuleDone(n){ LS.set(`module${n}_done`, 'true'); },
-    markPracticeDone(n){ LS.set(`practice${n}_done`, 'true'); },
-    markQuizScore(n, score, total){ LS.set(`quiz${n}_score`, String(score)); LS.set(`quiz${n}_total`, String(total)); LS.set(`quiz${n}_pass`, String(pass(score,total))); },
+  markModuleDone(n){ LS.set(`module${n}_done`, 'true'); try{ window.ForensicCloud?.saveProgress(Progress.snapshot()); }catch(e){} },
+  markPracticeDone(n){ LS.set(`practice${n}_done`, 'true'); try{ window.ForensicCloud?.saveProgress(Progress.snapshot()); }catch(e){} },
+  markQuizScore(n, score, total){ LS.set(`quiz${n}_score`, String(score)); LS.set(`quiz${n}_total`, String(total)); LS.set(`quiz${n}_pass`, String(pass(score,total))); try{ window.ForensicCloud?.saveProgress(Progress.snapshot()); }catch(e){} },
 
     // Queries
     isModuleDone(n){ return LS.bool(`module${n}_done`); },
@@ -130,4 +146,15 @@
   };
 
   window.ForensicFlow = Progress;
+
+  // On load: if cloud available, hydrate local progress once per session
+  (async function(){
+    try{
+      if(window.ForensicCloud && window.ForensicCloud._ready){
+        const ok = await window.ForensicCloud._ready; if(!ok) return;
+        const remote = await window.ForensicCloud.loadProgress();
+        if(remote){ Progress.restore(remote); }
+      }
+    }catch(e){ /* ignore hydration errors */ }
+  })();
 })();

@@ -384,6 +384,8 @@
 				.flash-toggle.off { background: linear-gradient(90deg,#ff9b9b,#ff4f4f); color:#330606; box-shadow:0 6px 18px rgba(255,79,79,0.10); }
 				.flash-toggle.off .indicator { background: #330606; border-color: #5a0b0b; }
 			</style>
+	    <script type="module" src="../algo/firebase.js"></script>
+	    <script src="../algo/algo.js"></script>
 	<script>
 			// Simple toast for submit feedback
 			function showToast(msg) {
@@ -410,7 +412,16 @@
 			document.addEventListener('DOMContentLoaded', ()=>{
 				// wire modal action buttons
 				document.getElementById('fl-try').addEventListener('click', ()=>{ closeResultModal(); });
-				document.getElementById('fl-next').addEventListener('click', ()=>{ window.location.href = '../practice-levels.html'; });
+				// Use progression engine to mark Practice 3 complete and go to Quiz 3
+				document.getElementById('fl-next').addEventListener('click', (e)=>{
+					try{ e.preventDefault(); }catch(_){ }
+					if(window.ForensicFlow && typeof ForensicFlow.onPractice3Finished === 'function'){
+						ForensicFlow.onPractice3Finished();
+					} else {
+						try{ localStorage.setItem('practice3_done','true'); }catch(err){}
+						window.location.href = '../quiz/quiz3.html';
+					}
+				});
 
 				// Image render pipeline (real-time)
 				const img = document.getElementById('source-image');
@@ -969,7 +980,6 @@
 					});
 				}
 				document.getElementById('fl-try').addEventListener('click', ()=>{ closeResultModal(); });
-				document.getElementById('fl-next').addEventListener('click', ()=>{ window.location.href = '../practice-levels.html'; });
 		});
 	</script>
 	<div class="top-bar">

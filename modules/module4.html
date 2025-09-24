@@ -17,6 +17,8 @@
       }
     }
   </script>
+  <script type="module" src="../algo/firebase.js"></script>
+  <script src="../algo/algo.js"></script>
 </head>
 <body>
   <div class="min-h-dvh flex flex-col items-center bg-bg text-white font-sans">
@@ -410,10 +412,13 @@
         });
 
         doneBtn.addEventListener('click', ()=>{
-          // After practice, return to use-cases (or keep here). You can tweak this behavior.
-          step = 2;
-          if (nextBtn) nextBtn.classList.remove('hidden');
-          renderUseCases();
+          // After practice, mark Module 4 finished and go to Level 4
+          if(window.ForensicFlow && typeof ForensicFlow.onModule4Finished === 'function'){
+            ForensicFlow.onModule4Finished();
+          } else {
+            try{ localStorage.setItem('module4_done','true'); }catch(e){}
+            window.location.href = '../levels/level4.html';
+          }
         });
       }
       render();
