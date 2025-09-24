@@ -25,11 +25,16 @@
 	</style>
 	<body class="min-h-screen bg-bg text-white font-sans overflow-hidden">
 		<div id="main-content" class="max-w-[760px] mx-auto px-4 pt-5 pb-[140px]">
-			<header class="flex flex-col items-center gap-2 text-center">
-				<h1 class="font-heading text-[28px] font-bold leading-tight">Module 3 Quiz</h1>
-				<p class="text-muted">Oblique Lighting — Techniques and Use</p>
-				<div id="progress" class="flex gap-3 mt-2 w-full"></div>
+			<header class="grid [grid-template-columns:56px_1fr_56px] items-center justify-items-center gap-3 text-center">
+				<button onclick="window.location.href='../index.html'" aria-label="Back"
+					class="w-14 h-14 rounded-xl border-2 border-white/20 bg-[#232326] text-white/60 grid place-items-center">◀</button>
+				<div class="flex flex-col items-center">
+					<h1 class="font-heading text-[28px] font-bold leading-tight">Module 3 Quiz</h1>
+					<p class="text-muted">Oblique Lighting — Techniques and Use</p>
+				</div>
+				<div aria-hidden="true"></div>
 			</header>
+			<div id="progress" class="flex gap-3 mt-2 w-full"></div>
 
 					<main class="mt-4">
 						<section class="bg-card border border-white/5 rounded-2xl p-5">

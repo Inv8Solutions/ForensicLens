@@ -259,5 +259,17 @@
       </div>
     </div>
   </div>
+  <script src="./algo/algo.js"></script>
+  <script>
+    // Apply locks based on Module 1 completion (handle late script load)
+    (function(){
+      function apply(){ if(window.ForensicFlow){ window.ForensicFlow.applyPracticeLocks(document); } }
+      if(document.readyState === 'loading'){
+        document.addEventListener('DOMContentLoaded', apply);
+      } else {
+        apply();
+      }
+    })();
+  </script>
 </body>
 </html>
