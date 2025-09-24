@@ -139,23 +139,26 @@
     document.getElementById('retake').addEventListener('click', ()=>{
       localStorage.removeItem('quiz1_answers');
       window.location.href = '../quiz1.html';
-    });
+    }, { once: true });
     nextBtn.addEventListener('click', ()=>{
+      if(nextBtn.disabled) return;
+      if(window.__clickedNextModule) return; window.__clickedNextModule = true;
       // Explicit next navigation to Module 2
       window.location.href = '../../modules/module2.html';
-    });
+    }, { once: true });
 
     // Modal actions
     modalProceed.addEventListener('click', ()=>{
+      if(window.__clickedNextModule) return; window.__clickedNextModule = true;
       window.location.href = '../../modules/module2.html';
-    });
+    }, { once: true });
     modalRetake.addEventListener('click', ()=>{
       localStorage.removeItem('quiz1_answers');
       window.location.href = '../quiz1.html';
-    });
+    }, { once: true });
     modalClose.addEventListener('click', ()=>{
       modal.classList.remove('show');
-    });
+    }, { once: true });
   </script>
 </body>
 </html>

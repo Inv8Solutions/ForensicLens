@@ -502,16 +502,17 @@
 					1, 1, 1, 1
 				]);
 
-				// Hook next to mark practice done and go to quiz via engine
+				// Hook next to mark practice done and go to quiz via engine (one-time)
 				document.getElementById('fl-next').addEventListener('click', (e)=>{
 					e.preventDefault();
+					if (window.__clickedNext) return; window.__clickedNext = true;
 					if(window.ForensicFlow && typeof ForensicFlow.onPractice1Finished === 'function'){
 						ForensicFlow.onPractice1Finished();
 					} else {
 						try{ localStorage.setItem('practice1_done','true'); }catch(err){}
 						window.location.href = '../quiz/quiz1.html';
 					}
-				});
+				}, { once: true });
 
 				function setupQuad(){
 					const vao = gl.createVertexArray(); gl.bindVertexArray(vao);

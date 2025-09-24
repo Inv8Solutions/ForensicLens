@@ -43,6 +43,18 @@
     try{ window.location.href = base + rel; }catch(e){ window.location.assign(base + rel); }
   }
 
+  // Re-entrancy/overlap guard for navigation flows
+  let __transitioning = false;
+  function onceTransition(fn){
+    if(__transitioning) return;
+    __transitioning = true;
+    try{ fn && fn(); }
+    finally{
+      // In normal cases the page will navigate; as a fallback, release after a short delay
+      setTimeout(()=>{ __transitioning = false; }, 2000);
+    }
+  }
+
   // API exposed on window
   const Progress = {
     // Take a snapshot of relevant keys for cloud sync
@@ -141,34 +153,24 @@
 
     // Flow helpers
     // Call after Module 1 finish
-    onModule1Finished(){
-      Progress.markModuleDone(1);
-      goRoot('levels/level1.html');
-    },
+    onModule1Finished(){ onceTransition(()=>{ Progress.markModuleDone(1); goRoot('levels/level1.html'); }); },
     // Call after Practice Level 1 finish
-    onPractice1Finished(){
-      Progress.markPracticeDone(1);
-      window.location.href = './quiz/quiz1.html';
-    },
+    onPractice1Finished(){ onceTransition(()=>{ Progress.markPracticeDone(1); window.location.href = './quiz/quiz1.html'; }); },
     // After Quiz 1 submit (call with score & total)
-    afterQuiz1(score,total){
-      Progress.markQuizScore(1, score, total);
-      if(pass(score,total)) goRoot('modules/module2.html');
-      else goRoot('quiz/results/quiz1-result.html');
-    },
+    afterQuiz1(score,total){ onceTransition(()=>{ Progress.markQuizScore(1, score, total); if(pass(score,total)) goRoot('modules/module2.html'); else goRoot('quiz/results/quiz1-result.html'); }); },
 
     // After finishing Module 2
-  onModule2Finished(){ Progress.markModuleDone(2); goRoot('levels/level2.html'); },
-  onPractice2Finished(){ Progress.markPracticeDone(2); goRoot('quiz/quiz2.html'); },
-  afterQuiz2(score,total){ Progress.markQuizScore(2, score, total); if(pass(score,total)) goRoot('modules/module3.html'); else goRoot('quiz/results/quiz2-result.html'); },
+  onModule2Finished(){ onceTransition(()=>{ Progress.markModuleDone(2); goRoot('levels/level2.html'); }); },
+  onPractice2Finished(){ onceTransition(()=>{ Progress.markPracticeDone(2); goRoot('quiz/quiz2.html'); }); },
+  afterQuiz2(score,total){ onceTransition(()=>{ Progress.markQuizScore(2, score, total); if(pass(score,total)) goRoot('modules/module3.html'); else goRoot('quiz/results/quiz2-result.html'); }); },
 
-  onModule3Finished(){ Progress.markModuleDone(3); goRoot('levels/level3.html'); },
-  onPractice3Finished(){ Progress.markPracticeDone(3); goRoot('quiz/quiz3.html'); },
-  afterQuiz3(score,total){ Progress.markQuizScore(3, score, total); if(pass(score,total)) goRoot('modules/module4.html'); else goRoot('quiz/results/quiz3-result.html'); },
+  onModule3Finished(){ onceTransition(()=>{ Progress.markModuleDone(3); goRoot('levels/level3.html'); }); },
+  onPractice3Finished(){ onceTransition(()=>{ Progress.markPracticeDone(3); goRoot('quiz/quiz3.html'); }); },
+  afterQuiz3(score,total){ onceTransition(()=>{ Progress.markQuizScore(3, score, total); if(pass(score,total)) goRoot('modules/module4.html'); else goRoot('quiz/results/quiz3-result.html'); }); },
 
-    onModule4Finished(){ Progress.markModuleDone(4); goRoot('levels/level4.html'); },
-    onPractice4Finished(){ Progress.markPracticeDone(4); goRoot('quiz/quiz4.html'); },
-    afterQuiz4(score,total){ Progress.markQuizScore(4, score, total); goRoot('quiz/results/quiz4-result.html'); }
+    onModule4Finished(){ onceTransition(()=>{ Progress.markModuleDone(4); goRoot('levels/level4.html'); }); },
+    onPractice4Finished(){ onceTransition(()=>{ Progress.markPracticeDone(4); goRoot('quiz/quiz4.html'); }); },
+    afterQuiz4(score,total){ onceTransition(()=>{ Progress.markQuizScore(4, score, total); goRoot('quiz/results/quiz4-result.html'); }); }
   };
 
   window.ForensicFlow = Progress;
