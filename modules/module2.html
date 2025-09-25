@@ -95,7 +95,15 @@
                     </div>
                 </div>
                 <div class="image-wrap">
-                    <img id="moduleImage" src="../assets/module2.png" alt="Parts of the camera diagram">
+                    <img
+                        id="moduleImage"
+                        src="../assets/module2.png"
+                        data-img1="../assets/module2-1-shutter.jpg"
+                        data-img2="../assets/module2-2-aperture.jpg"
+                        data-img3="../assets/module2-3-iso.jpg"
+                        data-img4="../assets/module2-4-window.jpg"
+                        alt="Parts of the camera diagram"
+                    >
                 </div>
                 <!-- Content -->
                 <div class="content-scroll" aria-label="Shutter speed explanation">
@@ -153,6 +161,26 @@
         // keep the original children so we don't destructively remove them
         const originalChildren = Array.from(content.children);
 
+        // Image switching per step (1..4). Paths are configurable via data-img1..4 on #moduleImage
+        const imgEl = document.getElementById('moduleImage');
+        const stepImages = [
+            imgEl.dataset.img1 || imgEl.getAttribute('src'),
+            imgEl.dataset.img2 || imgEl.getAttribute('src'),
+            imgEl.dataset.img3 || imgEl.getAttribute('src'),
+            imgEl.dataset.img4 || imgEl.getAttribute('src'),
+        ];
+        function setStepImage(s){
+            const idx = Math.max(1, Math.min(4, s)) - 1;
+            const nextSrc = stepImages[idx];
+            if (nextSrc && imgEl.src !== nextSrc){
+                imgEl.src = nextSrc;
+                const ov = document.getElementById('overlayImg');
+                if (ov) ov.src = nextSrc;
+            }
+        }
+        // initialize first step image
+        setStepImage(1);
+
         function loadApertureCard(){
             // Hide existing children instead of removing them (safer)
             originalChildren.forEach(ch => { ch.style.display = 'none'; });
@@ -188,6 +216,9 @@
 
             // mark completed up to seg2
             markCompletedSegments(2);
+
+            // switch image to step 2
+            setStepImage(2);
 
             // update header progress text if present
             const overlayPs = document.querySelectorAll('.progress-overlay p');
@@ -235,6 +266,9 @@
             // mark completed up to seg3
             markCompletedSegments(3);
 
+            // switch image to step 3
+            setStepImage(3);
+
             // update header progress text if present
             const overlayPs = document.querySelectorAll('.progress-overlay p');
             if (overlayPs && overlayPs.length >= 2) overlayPs[1].textContent = '3/4';
@@ -276,6 +310,9 @@
             // mark seg4 active and mark prior ones completed
             markCompletedSegments(4);
 
+            // switch image to step 4
+            setStepImage(4);
+
             const overlayPs = document.querySelectorAll('.progress-overlay p');
             if (overlayPs && overlayPs.length >= 2) overlayPs[1].textContent = '4/4';
 
@@ -307,9 +344,17 @@
         // defensive: if asset missing, show fallback text
         const img = document.getElementById('moduleImage');
         img.addEventListener('error', ()=>{
+            // Try fallback to the base diagram first
+            const fallback = '../assets/module2.png';
+            if (!img.dataset._triedFallback){
+                img.dataset._triedFallback = '1';
+                img.src = fallback;
+                return;
+            }
+            // If even fallback fails, show a gentle message
             img.style.display = 'none';
             const w = document.querySelector('.image-wrap');
-            w.innerHTML = '<div style="color:var(--muted);">Image not found: ../assets/partosofcamera.png</div>';
+            w.innerHTML = '<div style="color:var(--muted);">Image not available.</div>';
         });
 
         // --- Orientation / portrait viewer helpers ---
@@ -322,7 +367,7 @@
                     <button class="btn" id="rotateOpen">Open Portrait View</button>
                     <button class="btn" id="rotateClose" style="display:none">Close</button>
                 </div>
-                <img id="overlayImg" src="${img.src}" alt="Full portrait diagram">
+                <img id="overlayImg" src="${document.getElementById('moduleImage').src}" alt="Full portrait diagram">
             </div>
         `;
         document.body.appendChild(overlay);
