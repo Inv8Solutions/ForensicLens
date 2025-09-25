@@ -155,7 +155,7 @@
     // Call after Module 1 finish
     onModule1Finished(){ onceTransition(()=>{ Progress.markModuleDone(1); goRoot('levels/level1.html'); }); },
     // Call after Practice Level 1 finish
-    onPractice1Finished(){ onceTransition(()=>{ Progress.markPracticeDone(1); window.location.href = './quiz/quiz1.html'; }); },
+  onPractice1Finished(){ onceTransition(()=>{ Progress.markPracticeDone(1); goRoot('quiz/quiz1.html'); }); },
     // After Quiz 1 submit (call with score & total)
     afterQuiz1(score,total){ onceTransition(()=>{ Progress.markQuizScore(1, score, total); if(pass(score,total)) goRoot('modules/module2.html'); else goRoot('quiz/results/quiz1-result.html'); }); },
 

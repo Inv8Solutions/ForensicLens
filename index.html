@@ -241,9 +241,9 @@
 		<div class="progress-card" style="position: relative;">
 			<div class="progress-label">Current Progress</div>
 			<div class="progress-bar-bg">
-				<div class="progress-bar" style="width: 68%;"></div>
+				<div class="progress-bar" style="width: 0%;"></div>
 			</div>
-			<div class="progress-percent" style="right: 20px; top: 18px;">32%</div>
+			<div class="progress-percent" style="right: 20px; top: 18px;">0%</div>
 		</div>
 
 		<div class="card">
@@ -255,7 +255,7 @@
 						<path d="M10.5 19c-1.5 0-2.5-1.2-2.5-2.5 0-.7.3-1.3.7-1.8-.1-.3-.2-.7-.2-1.1 0-1.1.9-2 2-2 .2 0 .4 0 .6.1.2-.7.8-1.2 1.6-1.2.2 0 .4 0 .6.1.2-.7.8-1.2 1.6-1.2 1.1 0 2 .9 2 2 0 .2 0 .4-.1.6.7.2 1.2.8 1.2 1.6 0 .2 0 .4-.1.6.7.2 1.2.8 1.2 1.6 0 1.1-.9 2-2 2-.2 0-.4 0-.6-.1-.2.7-.8 1.2-1.6 1.2-.2 0-.4 0-.6-.1-.2.7-.8 1.2-1.6 1.2z" fill="#fff"/>
 					</svg>
 				</div>
-				<div class="pill">1/4 completed</div>
+				<div class="pill" id="modules-pill">0/4 completed</div>
 			</div>
 			<div class="card-title">Training Modules</div>
 			<div class="card-desc">Learn camera fundamentals and forensic photography theory.</div>
@@ -271,12 +271,67 @@
 						<path d="M19 18.5H9c-.8 0-1.5-.7-1.5-1.5v-5c0-.8.7-1.5 1.5-1.5h1.1l.6-1.2c.2-.3.5-.5.9-.5h3.8c.4 0 .7.2.9.5l.6 1.2H19c.8 0 1.5.7 1.5 1.5v5c0 .8-.7 1.5-1.5 1.5zM14 12.5A2.5 2.5 0 1 0 14 17.5a2.5 2.5 0 0 0 0-5z" fill="#fff"/>
 					</svg>
 				</div>
-				<div class="pill">2/4 completed</div>
+				<div class="pill" id="practice-pill">0/4 completed</div>
 			</div>
 			<div class="card-title">Practice Levels</div>
 			<div class="card-desc">Interactive forensic photography challenges</div>
 			<a href="./practice-levels.html" class="card-btn">Start Practice <span class="arrow">&#8594;</span></a>
 		</div>
 	</div>
+
+		<!-- Cloud progress (Firebase) and progression engine -->
+		<script type="module" src="./algo/firebase.js"></script>
+		<script src="./algo/algo.js"></script>
+		<script>
+			(function(){
+				const TOTAL_STEPS = 12; // 4 modules + 4 practice levels + 4 quizzes
+
+				function readFlag(key){ try{ return localStorage.getItem(key) === 'true'; }catch(e){ return false; } }
+
+				function countProgress(){
+					let modules=0, practices=0, quizzes=0;
+					for(let i=1;i<=4;i++){
+						const mod = (window.ForensicFlow && typeof ForensicFlow.isModuleDone==='function') ? ForensicFlow.isModuleDone(i) : readFlag(`module${i}_done`);
+						const prac = (window.ForensicFlow && typeof ForensicFlow.isPracticeDone==='function') ? ForensicFlow.isPracticeDone(i) : readFlag(`practice${i}_done`);
+						const qok = (window.ForensicFlow && typeof ForensicFlow.quizPass==='function') ? ForensicFlow.quizPass(i) : readFlag(`quiz${i}_pass`);
+						if(mod) modules++;
+						if(prac) practices++;
+						if(qok) quizzes++;
+					}
+					const done = modules + practices + quizzes;
+					const pct = Math.round((done / TOTAL_STEPS) * 100);
+					return { modules, practices, quizzes, done, pct: Math.max(0, Math.min(100, pct)) };
+				}
+
+				function applyProgress(){
+					const { modules, practices, pct } = countProgress();
+					const bar = document.querySelector('.progress-bar');
+					const lbl = document.querySelector('.progress-percent');
+					if(bar) bar.style.width = pct + '%';
+					if(lbl) lbl.textContent = pct + '%';
+					const modPill = document.getElementById('modules-pill');
+					const pracPill = document.getElementById('practice-pill');
+					if(modPill) modPill.textContent = `${modules}/4 completed`;
+					if(pracPill) pracPill.textContent = `${practices}/4 completed`;
+				}
+
+				async function hydrateThenApply(){
+					try{
+						if(window.ForensicCloud && window.ForensicCloud._ready){
+							await window.ForensicCloud._ready;
+						}
+					}catch(e){ /* ignore */ }
+					applyProgress();
+				}
+
+				// Initial run when DOM is ready
+				document.addEventListener('DOMContentLoaded', hydrateThenApply);
+
+				// Update when native auth restores progress
+				window.addEventListener('forensic-progress-restored', applyProgress);
+				// Update if another tab updates storage (defensive)
+				window.addEventListener('storage', applyProgress);
+			})();
+		</script>
 </body>
 </html>
