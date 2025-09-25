@@ -28,6 +28,8 @@ try {
 }
 
 const state = { uid: null, listeners: new Set() };
+let __resolveReady;
+let pendingProgress = null; // buffer for snapshots saved before auth
 
 // Helper: get custom token from URL if provided (fbct or customToken)
 function getTokenFromUrl(){
@@ -46,34 +48,50 @@ async function bootstrapAuth(){
     catch(e){ console.warn('Custom token sign-in failed, falling back to anon', e); }
   }
   try{ await signInAnonymously(auth); return true; }
-  catch(e){ console.warn('Anon auth error', e); return false; }
+  catch(e){ console.warn('Anon auth error', e); if (typeof __resolveReady === 'function') __resolveReady(false); return false; }
 }
 
 const ready = new Promise((resolve) => {
+  __resolveReady = resolve;
   if (!auth) { resolve(false); return; }
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       state.uid = user.uid;
       try{
-        // Load and restore progress automatically on auth changes
-        const progress = await loadProgress();
-        if(progress && window.ForensicFlow && typeof window.ForensicFlow.restore === 'function'){
-          window.ForensicFlow.restore(progress);
+        // Load remote progress
+        let remote = null;
+        try { const ref = doc(db, 'users', state.uid); const snap = await getDoc(ref); remote = snap.exists()? (snap.data()?.progress || null) : null; } catch (_) { /* ignore */ }
+        // Merge with any pending local snapshot saved before auth
+        const merged = pendingProgress ? { ...(remote || {}), ...pendingProgress } : (remote || null);
+        if(merged && window.ForensicFlow && typeof window.ForensicFlow.restore === 'function'){
+          window.ForensicFlow.restore(merged);
+        }
+        // If there was pending progress, flush it to Firestore and clear buffer
+        if(pendingProgress){
+          try{ const ref = doc(db, 'users', state.uid); await setDoc(ref, { progress: merged, updatedAt: serverTimestamp() }, { merge: true }); }catch(_){ /* ignore */ }
+          pendingProgress = null;
         }
         // Notify listeners/subscribers
         try{ window.dispatchEvent(new CustomEvent('forensic-auth', { detail: { uid: user.uid } })); }catch(_){}
-        try{ if(progress) window.dispatchEvent(new CustomEvent('forensic-progress-restored', { detail: { uid: user.uid, progress } })); }catch(_){}
+        try{ if(merged) window.dispatchEvent(new CustomEvent('forensic-progress-restored', { detail: { uid: user.uid, progress: merged } })); }catch(_){ }
       }catch(e){ /* ignore */ }
       resolve(true);
     }
   });
   // kick off first sign-in attempt
-  bootstrapAuth();
+  bootstrapAuth().catch(()=>{ try{ __resolveReady && __resolveReady(false); }catch(_){ } });
+  // Safety: if nothing happens within 3 seconds, resolve false to allow UI to proceed
+  setTimeout(()=>{ try{ __resolveReady && __resolveReady(false); }catch(_){ } }, 3000);
 });
 
 async function saveProgress(progress) {
   try {
-    const ok = await ready; if (!ok || !db || !state.uid) return false;
+    const ok = await ready;
+    if(!ok || !db || !state.uid){
+      // Buffer for later flush after custom-token sign-in
+      pendingProgress = { ...(pendingProgress || {}), ...(progress || {}) };
+      return false;
+    }
     const ref = doc(db, 'users', state.uid);
     const payload = {
       progress: progress || {},

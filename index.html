@@ -286,7 +286,14 @@
 			(function(){
 				const TOTAL_STEPS = 12; // 4 modules + 4 practice levels + 4 quizzes
 
-				function readFlag(key){ try{ return localStorage.getItem(key) === 'true'; }catch(e){ return false; } }
+						function readFlag(key){
+							try{
+								const v = localStorage.getItem(key);
+								if(v == null) return false;
+								const s = String(v).trim().toLowerCase();
+								return s === 'true' || s === '1';
+							}catch(e){ return false; }
+						}
 
 				function countProgress(){
 					let modules=0, practices=0, quizzes=0;
@@ -303,8 +310,8 @@
 					return { modules, practices, quizzes, done, pct: Math.max(0, Math.min(100, pct)) };
 				}
 
-				function applyProgress(){
-					const { modules, practices, pct } = countProgress();
+						async function applyProgress(){
+							const { modules, practices, quizzes, pct, done } = countProgress();
 					const bar = document.querySelector('.progress-bar');
 					const lbl = document.querySelector('.progress-percent');
 					if(bar) bar.style.width = pct + '%';
@@ -313,19 +320,44 @@
 					const pracPill = document.getElementById('practice-pill');
 					if(modPill) modPill.textContent = `${modules}/4 completed`;
 					if(pracPill) pracPill.textContent = `${practices}/4 completed`;
+							// Optional: if we have progress and cloud is ready, sync snapshot
+							try{
+								if(done > 0 && window.ForensicCloud && window.ForensicCloud._ready && window.ForensicFlow && typeof window.ForensicFlow.snapshot==='function'){
+									const ok = await window.ForensicCloud._ready; if(ok){
+										try{ await window.ForensicCloud.saveProgress(window.ForensicFlow.snapshot()); }catch(_){ }
+									}
+								}
+							}catch(_){ }
+							// Dev hint: if pct == 0 but any LS flag true, log for diagnosis
+							try{
+								if(pct === 0){
+									let any = false; for(let i=1;i<=4;i++){ if(readFlag(`module${i}_done`) || readFlag(`practice${i}_done`) || readFlag(`quiz${i}_pass`)) { any = true; break; } }
+									if(any) console.warn('[ForensicLens] Progress flags found in localStorage but computed pct is 0.');
+								}
+							}catch(_){ }
 				}
 
-				async function hydrateThenApply(){
-					try{
-						if(window.ForensicCloud && window.ForensicCloud._ready){
-							await window.ForensicCloud._ready;
+						async function hydrateThenApply(){
+							// Apply immediately from localStorage so users see progress without waiting for auth
+							try { applyProgress(); } catch(_) {}
+							try{
+								if(window.ForensicCloud && window.ForensicCloud._ready){
+									const ok = await window.ForensicCloud._ready;
+									if(!ok) { try{ console.warn('[ForensicLens] Not signed in; progress will sync after native token.'); }catch(_){} }
+								}
+							}catch(e){ /* ignore */ }
+							// Apply again after hydration/auth
+							applyProgress();
 						}
-					}catch(e){ /* ignore */ }
-					applyProgress();
-				}
 
-				// Initial run when DOM is ready
-				document.addEventListener('DOMContentLoaded', hydrateThenApply);
+								// Initial run when DOM is ready
+								document.addEventListener('DOMContentLoaded', ()=>{
+									hydrateThenApply();
+									// extra retries to catch late hydration or async module loads
+									setTimeout(applyProgress, 250);
+									setTimeout(applyProgress, 1000);
+									setTimeout(applyProgress, 2000);
+								});
 
 				// Update when native auth restores progress
 				window.addEventListener('forensic-progress-restored', applyProgress);
