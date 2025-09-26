@@ -372,6 +372,13 @@
 			.btn:active { transform: translateY(1px); }
 		</style>
 
+		<!-- Camera Modes styles -->
+		<style>
+			.modes { display: flex; gap: 10px; background: #1b1b1d; border: 1px solid #2b2b2b; border-radius: 14px; padding: 8px; margin-bottom: 10px; }
+			.modes .mode { flex: 1; background: #2a2a2e; color: #ddd; border: 1px solid #2f2f2f; border-radius: 12px; padding: 10px 12px; font-weight: 700; cursor: pointer; text-align: center; }
+			.modes .mode.active { background: linear-gradient(90deg,#6fe27a,#2fc24a); color:#082308; border-color:#0b5a0d; box-shadow:0 6px 18px rgba(47,194,74,0.12); }
+		</style>
+
 			<style>
 				/* Flash toggle visual styles */
 				.flash-toggle { display:flex; align-items:center; gap:8px; justify-content:flex-start; padding:10px 12px; border-radius:12px; background:#171718; border:1px solid #2b2b2b; color:#ddd; font-weight:700; cursor:pointer; width:100%; transition: background 160ms, color 160ms, box-shadow 160ms; }
@@ -1096,6 +1103,12 @@
 					</div>
 				</div>
 				<div class="flex-right">
+					<!-- Camera Modes -->
+					<div class="modes" role="tablist" aria-label="Camera Modes">
+						<button class="mode active" role="tab" aria-selected="true" data-mode="M">Manual (M)</button>
+						<button class="mode" role="tab" aria-selected="false" data-mode="Tv">Shutter Priority (Tv)</button>
+						<button class="mode" role="tab" aria-selected="false" data-mode="Av">Aperture Priority (Av)</button>
+					</div>
 					<!-- Header: title on the left, flash toggle on the right -->
 					<div class="controls-title" style="display:flex; justify-content:space-between; align-items:center;">
 						<span>Camera Controls</span>
@@ -1147,7 +1160,22 @@
 					</div>
 				</div>
 			</div>
-        </div>
-    </div>
+		</div>
+	</div>
+	<!-- Camera Modes behavior (simple toggle) -->
+	<script>
+		document.addEventListener('DOMContentLoaded', function(){
+			const container = document.querySelector('.modes');
+			if(!container) return;
+			container.querySelectorAll('.mode').forEach(btn => {
+				btn.addEventListener('click', () => {
+					container.querySelectorAll('.mode').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
+					btn.classList.add('active');
+					btn.setAttribute('aria-selected','true');
+					// Note: selection is visual only; hook into rendering if needed later.
+				}, { once: false });
+			});
+		});
+	</script>
 </body>
 </html>
