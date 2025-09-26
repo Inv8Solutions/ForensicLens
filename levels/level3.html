@@ -676,10 +676,48 @@
 					const iso = document.getElementById('iso-val'); if(iso) iso.textContent = document.getElementById('iso-slider').value;
 				}
 
+				// Compute desired exposure slider to hit ideal stops
+				function computeDesiredExposureLevel3(){
+					const iso = parseFloat(document.getElementById('iso-slider').value);
+					const aperture = parseFloat(document.getElementById('aperture-slider').value);
+					const shutter = parseFloat(document.getElementById('shutter-slider').value); // seconds
+					const cur = stopsForSettingsLevel3({ iso, aperture, shutter, exposure: 0 });
+					const ideal = stopsForSettingsLevel3({ iso: IDEAL_LEVEL3.iso, aperture: IDEAL_LEVEL3.aperture, shutter: IDEAL_LEVEL3.shutter, exposure: 0 });
+					let needed = ideal.totalStops - cur.totalStops;
+					const exEl = document.getElementById('exposure-slider');
+					if(exEl){
+						const min = parseFloat(exEl.getAttribute('min') || -3);
+						const max = parseFloat(exEl.getAttribute('max') || 3);
+						if(needed < min) needed = min;
+						if(needed > max) needed = max;
+						needed = Math.round(needed * 10) / 10;
+					}
+					return needed;
+				}
+
+				function updateExposureMeterLevel3(){
+					const vals = getCurrentValues();
+					const result = evaluateUserLevel3(vals);
+					const lbl = document.querySelector('.exposure-label span');
+					if(!lbl) return;
+					const d = result.delta;
+					if(Math.abs(d) <= 0.25){ lbl.textContent = 'GOOD EXPOSURE'; lbl.style.color = '#9be89b'; }
+					else if(d > 0){ lbl.textContent = 'OVEREXPOSED'; lbl.style.color = '#ffb86b'; }
+					else { lbl.textContent = 'UNDEREXPOSED'; lbl.style.color = '#ff5c5c'; }
+				}
+
 				['aperture-slider','shutter-slider','iso-slider','exposure-slider'].forEach(id=>{
 					const el = document.getElementById(id);
 					if(!el) return;
-					el.addEventListener('input', ()=>{ updateLabels(); scheduleApply(); });
+					el.addEventListener('input', ()=>{
+						updateLabels();
+						if(id !== 'exposure-slider'){
+							const desired = computeDesiredExposureLevel3();
+							const exEl = document.getElementById('exposure-slider'); if(exEl) exEl.value = desired;
+						}
+						scheduleApply();
+						updateExposureMeterLevel3();
+					});
 				});
 
 				window.addEventListener('resize', ()=>{ fitCanvas(); if(gl) resizeGLTextures(); scheduleApply(); });
@@ -763,16 +801,10 @@
 			// Exposure slider live update
 			(function(){
 				const ex = document.getElementById('exposure-slider');
-				const lbl = document.querySelector('.exposure-label span');
-				if(!ex || !lbl) return;
-				function updateExposure(v) {
-					const val = parseFloat(v);
-					if(val <= -1.2) { lbl.textContent = 'UNDEREXPOSED'; lbl.style.color = '#ff5c5c'; }
-					else if(val >= 1.2) { lbl.textContent = 'OVEREXPOSED'; lbl.style.color = '#ffb86b'; }
-					else { lbl.textContent = 'GOOD EXPOSURE'; lbl.style.color = '#9be89b'; }
-				}
-				updateExposure(ex.value);
-				ex.addEventListener('input', (e)=>{ updateExposure(e.target.value); });
+				if(!ex) return;
+				function refresh(){ try{ updateExposureMeterLevel3(); }catch(e){} }
+				refresh();
+				ex.addEventListener('input', ()=>{ refresh(); });
 			})();
 
 		// Prevent portrait mode scrolling

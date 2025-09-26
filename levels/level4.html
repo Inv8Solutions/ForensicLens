@@ -741,10 +741,57 @@
 					const iso = document.getElementById('iso-val'); if(iso) iso.textContent = document.getElementById('iso-slider').value;
 				}
 
+				// Level 4 desired exposure and stops-based meter
+				const IDEAL_LEVEL4 = { iso: 400, aperture: 10, shutter: 125 };
+				function stopsForSettingsLevel4({iso, aperture, shutter, exposure}){
+					const shutterVal = parseFloat(shutter) || 125;
+					const shutterStops = Math.log2(125 / shutterVal);
+					const isoVal = parseFloat(iso) || 400;
+					const isoStops = Math.log2(isoVal / 400);
+					const f = parseFloat(aperture) || 10;
+					const apStops = 2.0 * Math.log2(10 / f);
+					const exposureSlider = parseFloat(exposure || 0);
+					return { totalStops: shutterStops + isoStops + apStops + exposureSlider, shutterStops, isoStops, apStops };
+				}
+				function evaluateUserLevel4(user){
+					const u = stopsForSettingsLevel4(user);
+					const ideal = stopsForSettingsLevel4({ iso: IDEAL_LEVEL4.iso, aperture: IDEAL_LEVEL4.aperture, shutter: IDEAL_LEVEL4.shutter, exposure: 0 });
+					const delta = u.totalStops - ideal.totalStops;
+					return { delta, withinTolerance: Math.abs(delta) <= 0.6 };
+				}
+				function computeDesiredExposureLevel4(){
+					const iso = parseFloat(document.getElementById('iso-slider').value);
+					const aperture = parseFloat(document.getElementById('aperture-slider').value);
+					const shutter = parseFloat(document.getElementById('shutter-slider').value);
+					const cur = stopsForSettingsLevel4({ iso, aperture, shutter, exposure: 0 });
+					const ideal = stopsForSettingsLevel4({ iso: IDEAL_LEVEL4.iso, aperture: IDEAL_LEVEL4.aperture, shutter: IDEAL_LEVEL4.shutter, exposure: 0 });
+					let needed = ideal.totalStops - cur.totalStops;
+					const exEl = document.getElementById('exposure-slider');
+					if(exEl){ const min = parseFloat(exEl.getAttribute('min') || -3); const max = parseFloat(exEl.getAttribute('max') || 3);
+						if(needed < min) needed = min; if(needed > max) needed = max; needed = Math.round(needed * 10)/10; }
+					return needed;
+				}
+				function updateExposureMeterLevel4(){
+					const vals = getCurrentValues();
+					const r = evaluateUserLevel4(vals);
+					const lbl = document.querySelector('.exposure-label span'); if(!lbl) return;
+					if(Math.abs(r.delta) <= 0.6){ lbl.textContent = 'GOOD EXPOSURE'; lbl.style.color = '#9be89b'; }
+					else if(r.delta > 0){ lbl.textContent = 'OVEREXPOSED'; lbl.style.color = '#ffb86b'; }
+					else { lbl.textContent = 'UNDEREXPOSED'; lbl.style.color = '#ff5c5c'; }
+				}
+
 				['aperture-slider','shutter-slider','iso-slider','exposure-slider'].forEach(id=>{
 					const el = document.getElementById(id);
 					if(!el) return;
-					el.addEventListener('input', ()=>{ updateLabels(); scheduleApply(); });
+					el.addEventListener('input', ()=>{
+						updateLabels();
+						if(id !== 'exposure-slider'){
+							const desired = computeDesiredExposureLevel4();
+							const exEl = document.getElementById('exposure-slider'); if(exEl) exEl.value = desired;
+						}
+						scheduleApply();
+						updateExposureMeterLevel4();
+					});
 				});
 
 				window.addEventListener('resize', ()=>{ fitCanvas(); if(gl) resizeGLTextures(); scheduleApply(); });
@@ -826,16 +873,10 @@
 			// Exposure slider live update
 			(function(){
 				const ex = document.getElementById('exposure-slider');
-				const lbl = document.querySelector('.exposure-label span');
-				if(!ex || !lbl) return;
-				function updateExposure(v) {
-					const val = parseFloat(v);
-					if(val <= -1.2) { lbl.textContent = 'UNDEREXPOSED'; lbl.style.color = '#ff5c5c'; }
-					else if(val >= 1.2) { lbl.textContent = 'OVEREXPOSED'; lbl.style.color = '#ffb86b'; }
-					else { lbl.textContent = 'GOOD EXPOSURE'; lbl.style.color = '#9be89b'; }
-				}
-				updateExposure(ex.value);
-				ex.addEventListener('input', (e)=>{ updateExposure(e.target.value); });
+				if(!ex) return;
+				function refresh(){ try{ updateExposureMeterLevel4(); }catch(e){} }
+				refresh();
+				ex.addEventListener('input', ()=>{ refresh(); });
 			})();
 
 		// Prevent portrait mode scrolling
