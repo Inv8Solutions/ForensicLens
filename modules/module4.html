@@ -271,24 +271,24 @@
 
           <section id="practiceStage" class="relative mx-auto mt-2 h-[300px] rounded-2xl border border-white/10 bg-[#2a2a2f] overflow-hidden">
             <!-- Hidden evidence: three glowing lines -->
-            <div id="evidence-lines" class="ev absolute right-8 bottom-8 opacity-0 transition-opacity duration-150">
+            <div id="evidence-lines" class="ev absolute right-8 bottom-8 opacity-0 transition-opacity duration-150" data-type="lines">
               <div class="w-20 h-[6px] rounded-full bg-violet-400/40 border border-violet-300/70 shadow-[0_0_18px_4px_rgba(167,139,250,0.55)] mb-1"></div>
               <div class="w-16 h-[6px] rounded-full bg-violet-400/40 border border-violet-300/70 shadow-[0_0_18px_4px_rgba(167,139,250,0.55)] mb-1"></div>
               <div class="w-24 h-[6px] rounded-full bg-violet-400/40 border border-violet-300/70 shadow-[0_0_18px_4px_rgba(167,139,250,0.55)]"></div>
             </div>
 
             <!-- Hidden evidence: fingerprint icon -->
-            <div class="ev absolute left-8 top-8 opacity-0 transition-opacity duration-150 text-violet-300 text-3xl" style="filter: drop-shadow(0 0 12px rgba(167,139,250,0.9));">
+            <div class="ev absolute left-8 top-8 opacity-0 transition-opacity duration-150 text-violet-300 text-3xl" data-type="icon" style="filter: drop-shadow(0 0 12px rgba(167,139,250,0.9));">
               <i class="fa-solid fa-fingerprint"></i>
             </div>
 
             <!-- Hidden evidence: droplet icon -->
-            <div class="ev absolute right-12 top-14 opacity-0 transition-opacity duration-150 text-violet-300 text-3xl" style="filter: drop-shadow(0 0 12px rgba(167,139,250,0.9));">
+            <div class="ev absolute right-12 top-14 opacity-0 transition-opacity duration-150 text-violet-300 text-3xl" data-type="icon" style="filter: drop-shadow(0 0 12px rgba(167,139,250,0.9));">
               <i class="fa-solid fa-droplet"></i>
             </div>
 
             <!-- Hidden evidence: document icon -->
-            <div class="ev absolute left-1/2 -translate-x-1/2 bottom-16 opacity-0 transition-opacity duration-150 text-violet-300 text-3xl" style="filter: drop-shadow(0 0 12px rgba(167,139,250,0.9));">
+            <div class="ev absolute left-1/2 -translate-x-1/2 bottom-16 opacity-0 transition-opacity duration-150 text-violet-300 text-3xl" data-type="icon" style="filter: drop-shadow(0 0 12px rgba(167,139,250,0.9));">
               <i class="fa-solid fa-file-lines"></i>
             </div>
 
@@ -339,10 +339,22 @@
             const dx = hc.x - ec.x;
             const dy = hc.y - ec.y;
             const d = Math.hypot(dx, dy);
-            const threshold = 130; // px
+            // Per-type detection radius and opacity mapping
+            const type = el.dataset.type || 'generic';
+            const baseThreshold = 130; // px for generic
+            const linesThreshold = 165; // wider detection radius for lines
+            const iconThreshold = 180; // wider detection radius for icons
+            const threshold = type === 'icon' ? iconThreshold : (type === 'lines' ? linesThreshold : baseThreshold);
             const t = clamp(1 - d/threshold, 0, 1);
-            el.style.opacity = (0.12 + 0.88*t).toString();
-            if (t >= 0.98){
+            // Lower max opacity for icons to keep them subtler
+            if (type === 'icon') {
+              el.style.opacity = (0.06 + 0.54*t).toString();
+            } else {
+              el.style.opacity = (0.12 + 0.88*t).toString();
+            }
+            // Per-type found cutoff: make lines easier to "find"
+            const foundCutoff = type === 'lines' ? 0.9 : 0.98;
+            if (t >= foundCutoff){
               anyFound = true;
               foundSet.add(idx);
             }
