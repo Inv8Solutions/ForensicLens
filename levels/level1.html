@@ -376,7 +376,14 @@
 		<style>
 			.modes { display: flex; gap: 10px; background: #1b1b1d; border: 1px solid #2b2b2b; border-radius: 14px; padding: 8px; margin-bottom: 10px; }
 			.modes .mode { flex: 1; background: #2a2a2e; color: #ddd; border: 1px solid #2f2f2f; border-radius: 12px; padding: 10px 12px; font-weight: 700; cursor: pointer; text-align: center; }
-			.modes .mode.active { background: linear-gradient(90deg,#6fe27a,#2fc24a); color:#082308; border-color:#0b5a0d; box-shadow:0 6px 18px rgba(47,194,74,0.12); }
+			.modes .mode.active { background: #d6d6da; color:#1b1b1d; border-color:#bdbdc2; box-shadow:0 6px 18px rgba(0,0,0,0.12); }
+		</style>
+
+		<!-- Disabled controls styles for Tv/Av modes -->
+		<style>
+			.control-group.control-disabled { opacity: 0.45; filter: grayscale(40%); }
+			.control-group.control-disabled .control-slider:disabled { cursor: not-allowed; }
+			.control-slider:disabled { opacity: 0.8; cursor: not-allowed; }
 		</style>
 
 			<style>
@@ -1162,19 +1169,44 @@
 			</div>
 		</div>
 	</div>
-	<!-- Camera Modes behavior (simple toggle) -->
+	<!-- Camera Modes behavior (mode-based control enabling) -->
 	<script>
 		document.addEventListener('DOMContentLoaded', function(){
 			const container = document.querySelector('.modes');
 			if(!container) return;
-			container.querySelectorAll('.mode').forEach(btn => {
+			const buttons = Array.from(container.querySelectorAll('.mode'));
+
+			function setDisabled(el, disabled){ if(!el) return; el.disabled = !!disabled; const grp = el.closest('.control-group'); if(grp){ grp.classList.toggle('control-disabled', !!disabled); } }
+			function applyModeToControls(mode){
+				const ap = document.getElementById('aperture-slider');
+				const sh = document.getElementById('shutter-slider');
+				const iso = document.getElementById('iso-slider');
+				const ex = document.getElementById('exposure-slider');
+				if(mode === 'M'){
+					[ap, sh, iso, ex].forEach(el => setDisabled(el, false));
+				}else if(mode === 'Tv'){
+					setDisabled(sh, false);
+					[ap, iso, ex].forEach(el => setDisabled(el, true));
+				}else if(mode === 'Av'){
+					setDisabled(ap, false);
+					[sh, iso, ex].forEach(el => setDisabled(el, true));
+				}
+				try{ if(typeof scheduleApply === 'function') scheduleApply(); }catch(e){}
+			}
+
+			buttons.forEach(btn => {
 				btn.addEventListener('click', () => {
-					container.querySelectorAll('.mode').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
+					buttons.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
 					btn.classList.add('active');
 					btn.setAttribute('aria-selected','true');
-					// Note: selection is visual only; hook into rendering if needed later.
-				}, { once: false });
+					const mode = btn.getAttribute('data-mode') || 'M';
+					applyModeToControls(mode);
+				});
 			});
+
+			// initialize to current active or default Manual
+			const initial = (container.querySelector('.mode.active')?.getAttribute('data-mode')) || 'M';
+			applyModeToControls(initial);
 		});
 	</script>
 </body>
