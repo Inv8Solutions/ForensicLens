@@ -139,7 +139,12 @@
       cursor: pointer;
       box-shadow: 0 2px 8px #ff3b3f22;
       transition: background 0.2s;
+      text-decoration: none; /* remove underline on link */
     }
+    /* Keep underline off for all link states */
+    .level-action .go-btn:visited,
+    .level-action .go-btn:hover,
+    .level-action .go-btn:focus { text-decoration: none; }
     .level-action .go-btn:hover {
       background: var(--button-bg-hover);
     }

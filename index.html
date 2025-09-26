@@ -169,7 +169,12 @@
 			gap: 10px;
 			transition: background 0.2s;
 			box-shadow: 0 2px 8px #ff3b3f22;
+			text-decoration: none; /* remove underline on CTA */
 		}
+		/* Keep underline off for all states */
+		.card-btn:visited,
+		.card-btn:hover,
+		.card-btn:focus { text-decoration: none; }
 		.card-btn:hover {
 			background: var(--button-bg-hover);
 		}
