@@ -9,7 +9,7 @@
   <style>
     :root{--bg:#0f0f10;--card:#232326;--muted:#b3b3b7;--accent:#ff3b3f;--card-border:#b3b3b733}
     html,body{height:100%;margin:0;background:var(--bg);font-family:Inter,Montserrat,Arial;color:#fff}
-    .wrap{max-width:520px;margin:24px auto;padding:18px;display:flex;flex-direction:column;align-items:center}
+    .wrap{max-width:520px;margin:24px auto;padding:18px}
     .medal-wrap{width:84px;height:84px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;background:linear-gradient(180deg,#ff6b6b,#e23b3b)}
     .card{background:#2f2f33;border-radius:16px;padding:26px 20px 22px;text-align:center}
     .title{font-size:30px;font-weight:800;margin-bottom:6px}
@@ -23,7 +23,6 @@
     .btn.primary{background:linear-gradient(90deg,#ff6b6b,#e23b3b);color:#fff}
     .btn:disabled{opacity:0.45;cursor:default}
     .back{background:var(--card);border-radius:12px;border:2px solid var(--card-border);width:56px;height:56px;display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer}
-    .helper{color:var(--muted);font-size:13px;margin-top:6px}
   </style>
   <script type="module" src="../../algo/firebase.js"></script>
   <script src="../../algo/algo.js"></script>
@@ -31,7 +30,7 @@
 <body>
   <div class="wrap">
     <div style="display:flex;justify-content:flex-start;margin-bottom:18px">
-      <button class="back" onclick="window.location.href='index.html'" aria-label="Back">◀</button>
+      <button class="back" onclick="window.location.href='../../index.html'" aria-label="Back">◀</button>
     </div>
 
     <div class="medal-wrap" aria-hidden="true">
