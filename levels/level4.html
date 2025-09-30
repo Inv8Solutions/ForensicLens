@@ -411,11 +411,37 @@
 					border-radius: 8px;
 					font-weight:600;
 					cursor: pointer;
+					transition: opacity 0.3s ease;
 				}
 				.lighting-option[aria-pressed="true"] {
 					background: linear-gradient(90deg,#2b7eeb,#2ad1d1);
 					color: #04121a;
 					box-shadow: 0 6px 16px rgba(42,209,209,0.12);
+				}
+				.lighting-option:disabled {
+					opacity: 0.6;
+					cursor: not-allowed;
+				}
+				.lighting-option.loading {
+					opacity: 0.7;
+					position: relative;
+				}
+				.lighting-option.loading::after {
+					content: '';
+					position: absolute;
+					top: 50%;
+					right: 8px;
+					width: 12px;
+					height: 12px;
+					margin-top: -6px;
+					border: 2px solid transparent;
+					border-top: 2px solid #ddd;
+					border-radius: 50%;
+					animation: spin 1s linear infinite;
+				}
+				@keyframes spin {
+					0% { transform: rotate(0deg); }
+					100% { transform: rotate(360deg); }
 				}
 			</style>
 	    <script type="module" src="../algo/firebase.js"></script>
@@ -920,6 +946,68 @@
 		});
 	</script>
 		<script>
+			// Preload all lighting effect images for faster switching
+			const lightingImages = {};
+			const imagePaths = {
+				'none': '../assets/fingerprint.png',
+				'diffused': '../level4/A. DiffusedLightingEffect.png',
+				'oblique': '../level4/B. ObliqueLightingEffect.png',
+				'transmitted': '../level4/C. TransmittedLightingEffect.png',
+				'ultraviolet': '../level4/D. UltraVioletLightingEffect.png'
+			};
+
+			// Track preloading progress
+			let imagesLoaded = 0;
+			const totalImages = Object.keys(imagePaths).length;
+			let preloadingComplete = false;
+
+			// Preload all images
+			Object.keys(imagePaths).forEach(type => {
+				const img = new Image();
+				img.onload = () => {
+					imagesLoaded++;
+					if(imagesLoaded === totalImages) {
+						preloadingComplete = true;
+						// Enable lighting options once all images are loaded
+						enableLightingOptions();
+					}
+				};
+				img.onerror = () => {
+					console.warn(`Failed to preload image: ${imagePaths[type]}`);
+					imagesLoaded++;
+					if(imagesLoaded === totalImages) {
+						preloadingComplete = true;
+						enableLightingOptions();
+					}
+				};
+				img.src = imagePaths[type];
+				lightingImages[type] = img;
+			});
+
+			// Fallback timeout to enable lighting options if preloading takes too long
+			setTimeout(() => {
+				if(!preloadingComplete) {
+					console.warn('Image preloading timeout - enabling lighting options');
+					enableLightingOptions();
+				}
+			}, 5000); // 5 second timeout
+
+			function enableLightingOptions() {
+				// Remove loading states from lighting buttons
+				const lightingBtns = document.querySelectorAll('.lighting-option');
+				lightingBtns.forEach(btn => {
+					btn.disabled = false;
+					btn.classList.remove('loading');
+					btn.style.opacity = '1';
+				});
+				
+				// Set the default "Normal" option as active
+				const normalBtn = document.querySelector('.lighting-option[data-type="none"]');
+				if(normalBtn) {
+					normalBtn.setAttribute('aria-pressed', 'true');
+				}
+			}
+
 			// Lighting options wiring: now uses the More Options modal
 			document.addEventListener('DOMContentLoaded', function(){
 				const modal = document.getElementById('moreOptionsModal');
@@ -939,17 +1027,10 @@
 				if(closeBtn){ closeBtn.addEventListener('click', function(){ closeModal(); }); }
 
 				function applyLighting(type){
-					// Map lighting types to ready-made images in ../level4/
+					// Use preloaded images for faster switching
 					const imgEl = document.getElementById('source-image');
-					let src = '../assets/fingerprint.png'; // default
-						switch(type){
-						case 'diffused': src = '../level4/A. DiffusedLightingEffect.png'; break;
-						case 'oblique': src = '../level4/B. ObliqueLightingEffect.png'; break;
-						case 'transmitted': src = '../level4/C. TransmittedLightingEffect.png'; break;
-						case 'ultraviolet': src = '../level4/D. UltraVioletLightingEffect.png'; break;
-						case 'none':
-					default: src = '../assets/fingerprint.png'; break;
-					}
+					const src = imagePaths[type] || imagePaths['none'];
+					
 					// If flash is currently enabled, disable it when applying a lighting preset
 					if(window._persistentFlash){
 						window._persistentFlash = false;
@@ -961,18 +1042,27 @@
 						updateCanvasFilter();
 					}
 					window._lightingType = type || 'none';
+					
 					if(imgEl){
-						imgEl.src = src;
-						// ensure the image loads then render. Handle cached images by triggering
-						// resize and scheduleApply immediately if already complete.
-						imgEl.onload = function(){
+						// Check if the preloaded image is ready
+						const preloadedImg = lightingImages[type] || lightingImages['none'];
+						if(preloadedImg && preloadedImg.complete){
+							// Image is already loaded, switch immediately
+							imgEl.src = src;
 							try{ if(typeof resizeGLTextures === 'function') resizeGLTextures(); }catch(e){}
 							try{ if(typeof scheduleApply === 'function') scheduleApply(); }catch(e){}
-						};
-						// Also trigger immediately in case the image is cached and .onload won't fire
-						if(imgEl.complete){
-							try{ if(window.resizeGLTextures) window.resizeGLTextures(); }catch(e){}
-							try{ if(window.scheduleApply) window.scheduleApply(); }catch(e){}
+						} else {
+							// Fallback to traditional loading if preload failed
+							imgEl.src = src;
+							imgEl.onload = function(){
+								try{ if(typeof resizeGLTextures === 'function') resizeGLTextures(); }catch(e){}
+								try{ if(typeof scheduleApply === 'function') scheduleApply(); }catch(e){}
+							};
+							// Also trigger immediately in case the image is cached and .onload won't fire
+							if(imgEl.complete){
+								try{ if(window.resizeGLTextures) window.resizeGLTextures(); }catch(e){}
+								try{ if(window.scheduleApply) window.scheduleApply(); }catch(e){}
+							}
 						}
 					}
 					updateCanvasFilter();
@@ -1096,11 +1186,11 @@
 				<div>
 					<div class="control-label" style="margin:0 0 6px 0; font-size:12px; color:#ddd;">Lighting</div>
 					<div class="lighting-list" role="list" style="display:flex; gap:8px; flex-wrap:wrap;">
-						<button class="lighting-option" data-type="none" aria-pressed="false" title="None" style="flex:1; min-width:76px;">Normal</button>
-						<button class="lighting-option" data-type="diffused" aria-pressed="false" title="Diffused Lighting" style="flex:1; min-width:76px;">Diffused</button>
-						<button class="lighting-option" data-type="oblique" aria-pressed="false" title="Oblique Lighting" style="flex:1; min-width:76px;">Oblique</button>
-						<button class="lighting-option" data-type="transmitted" aria-pressed="false" title="Transmitted Lighting" style="flex:1; min-width:76px;">Transmitted</button>
-						<button class="lighting-option" data-type="ultraviolet" aria-pressed="false" title="Ultraviolet Lighting" style="flex:1; min-width:76px;">Ultraviolet</button>
+						<button class="lighting-option loading" data-type="none" aria-pressed="false" title="None" style="flex:1; min-width:76px;" disabled>Normal</button>
+						<button class="lighting-option loading" data-type="diffused" aria-pressed="false" title="Diffused Lighting" style="flex:1; min-width:76px;" disabled>Diffused</button>
+						<button class="lighting-option loading" data-type="oblique" aria-pressed="false" title="Oblique Lighting" style="flex:1; min-width:76px;" disabled>Oblique</button>
+						<button class="lighting-option loading" data-type="transmitted" aria-pressed="false" title="Transmitted Lighting" style="flex:1; min-width:76px;" disabled>Transmitted</button>
+						<button class="lighting-option loading" data-type="ultraviolet" aria-pressed="false" title="Ultraviolet Lighting" style="flex:1; min-width:76px;" disabled>Ultraviolet</button>
 					</div>
 				</div>
 				<div style="display:flex; gap:8px; justify-content:flex-end; margin-top:6px;">
