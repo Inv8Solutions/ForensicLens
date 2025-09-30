@@ -91,9 +91,40 @@
     }
     if(!passed){ nextBtn.disabled = true; lockHelper.style.display = 'block'; } else { nextBtn.disabled = false; lockHelper.style.display = 'none'; }
 
-    document.getElementById('retake').addEventListener('click', ()=>{
-      localStorage.removeItem('quiz3_answers');
-      window.location.href = '../quiz3.html';
+    document.getElementById('retake').addEventListener('click', (e)=>{
+      e.preventDefault();
+      console.log('Retake quiz3 button clicked');
+      
+      // Visual feedback
+      const retakeBtn = document.getElementById('retake');
+      retakeBtn.textContent = 'Loading...';
+      retakeBtn.disabled = true;
+      
+      // Clear quiz answers with error handling
+      try {
+        localStorage.removeItem('quiz3_answers');
+        localStorage.removeItem('quiz3_score');
+        localStorage.removeItem('quiz3_total');
+        localStorage.removeItem('quiz3_pass');
+        console.log('Quiz3 data cleared');
+      } catch(error) {
+        console.error('Error clearing quiz3 data:', error);
+      }
+      
+      // Multiple navigation attempts for webview compatibility
+      const targetUrl = '../quiz3.html';
+      
+      try {
+        window.location.href = targetUrl;
+      } catch(error) {
+        console.error('Navigation method 1 failed:', error);
+        try {
+          window.location.replace(targetUrl);
+        } catch(error2) {
+          console.error('Navigation method 2 failed:', error2);
+          setTimeout(() => { window.location = targetUrl; }, 100);
+        }
+      }
     }, { once: true });
     nextBtn.addEventListener('click', ()=>{ 
       if(nextBtn.disabled) return;

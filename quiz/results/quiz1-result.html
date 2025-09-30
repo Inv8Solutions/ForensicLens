@@ -147,9 +147,51 @@
     modal.classList.add('show');
     */
 
-    document.getElementById('retake').addEventListener('click', ()=>{
-      localStorage.removeItem('quiz1_answers');
-      window.location.href = '../quiz1.html';
+    document.getElementById('retake').addEventListener('click', (e)=>{
+      e.preventDefault();
+      console.log('Retake button clicked');
+      
+      // Visual feedback
+      const retakeBtn = document.getElementById('retake');
+      retakeBtn.textContent = 'Loading...';
+      retakeBtn.disabled = true;
+      
+      // Clear quiz answers with error handling
+      try {
+        localStorage.removeItem('quiz1_answers');
+        localStorage.removeItem('quiz1_score');
+        localStorage.removeItem('quiz1_total');
+        localStorage.removeItem('quiz1_pass');
+        console.log('Quiz data cleared');
+      } catch(error) {
+        console.error('Error clearing quiz data:', error);
+      }
+      
+      // Multiple navigation attempts for webview compatibility
+      const targetUrl = '../quiz1.html';
+      
+      try {
+        // Method 1: Direct location change
+        window.location.href = targetUrl;
+      } catch(error) {
+        console.error('Method 1 failed:', error);
+        try {
+          // Method 2: Location replace
+          window.location.replace(targetUrl);
+        } catch(error2) {
+          console.error('Method 2 failed:', error2);
+          try {
+            // Method 3: Location assign
+            window.location.assign(targetUrl);
+          } catch(error3) {
+            console.error('Method 3 failed:', error3);
+            // Method 4: Fallback with setTimeout
+            setTimeout(() => {
+              window.location = targetUrl;
+            }, 100);
+          }
+        }
+      }
     }, { once: true });
     nextBtn.addEventListener('click', ()=>{
       if(nextBtn.disabled) return;
