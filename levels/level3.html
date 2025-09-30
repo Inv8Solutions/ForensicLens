@@ -233,16 +233,16 @@
 			font-family: 'Montserrat', Arial, sans-serif;
 			font-size: 13px;
 			font-weight: 700;
-			margin-bottom: 6px;
+			margin-bottom: -10px;
 			margin-top: 0;
 			display: flex;
 			align-items: center;
-			gap: 8px;
+			gap: 3px;
 		}
 		/* Slightly tighten the top of controls area */
 		.controls-inner { padding-top: 1px; }
 		.control-group {
-			margin-bottom: 20px;
+			margin-bottom: 12px;
             
 		}
 		.control-label {
@@ -252,6 +252,7 @@
 			display: flex;
 			align-items: center;
 			gap: 6px;
+			margin-bottom: -5px;
 		}
 		.control-slider {
 			width: 100%;
@@ -375,8 +376,8 @@
 
 		<!-- Camera Modes styles -->
 		<style>
-			.modes { display: flex; gap: 10px; background: #1b1b1d; border: 1px solid #2b2b2b; border-radius: 14px; padding: 8px; margin-bottom: 10px; }
-			.modes .mode { flex: 1; background: #2a2a2e; color: #ddd; border: 1px solid #2f2f2f; border-radius: 12px; padding: 10px 12px; font-weight: 700; cursor: pointer; text-align: center; }
+			.modes { display: flex; gap: 5px; background: #1b1b1d; border: 1px solid #2b2b2b; border-radius: 14px; padding: 2px;}
+			.modes .mode { flex: 1; background: #2a2a2e; color: #ddd; border: 1px solid #2f2f2f; border-radius: 12px; padding: 1px 12px; font-weight: 700; cursor: pointer; text-align: center; }
 			.modes .mode.active { background: #d6d6da; color:#1b1b1d; border-color:#bdbdc2; box-shadow:0 6px 18px rgba(0,0,0,0.12); }
 		</style>
 
@@ -1062,13 +1063,13 @@
 				</div>
 				<div class="flex-right">
 					<!-- Camera Modes -->
-					<div class="modes" role="tablist" aria-label="Camera Modes">
+					<div class="modes" role="tablist" aria-label="Camera Modes" style="gap:6px; padding:2px; margin-top: -5px;">
 						<button class="mode active" role="tab" aria-selected="true" data-mode="M">Manual (M)</button>
 						<button class="mode" role="tab" aria-selected="false" data-mode="Tv">Shutter Priority (Tv)</button>
 						<button class="mode" role="tab" aria-selected="false" data-mode="Av">Aperture Priority (Av)</button>
 					</div>
 					<!-- Header: title on the left, flash toggle on the right -->
-					<div class="controls-title" style="display:flex; justify-content:space-between; align-items:center;">
+					<div class="controls-title" style="display:flex; justify-content:space-between; align-items:center; margin-top: -12px;">
 						<span>Camera Controls</span>
 						<div style="display:flex; align-items:center; gap:8px;">
 							<div class="control-label" style="margin:0; font-size:12px;">Flash</div>
