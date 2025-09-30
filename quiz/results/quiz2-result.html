@@ -85,8 +85,14 @@
     }
     if(!passed){ nextBtn.disabled = true; lockHelper.style.display = 'block'; } else { nextBtn.disabled = false; lockHelper.style.display = 'none'; }
 
-    document.getElementById('retake').addEventListener('click', ()=>{ localStorage.removeItem('quiz2_answers'); window.location.href = '../quiz2.html'; });
-    nextBtn.addEventListener('click', ()=>{ window.location.href = '../../modules/module3.html'; });
+    document.getElementById('retake').addEventListener('click', ()=>{ 
+      localStorage.removeItem('quiz2_answers'); 
+      window.location.href = '../quiz2.html'; 
+    }, { once: true });
+    nextBtn.addEventListener('click', ()=>{ 
+      if(nextBtn.disabled) return;
+      window.location.href = '../../modules/module3.html'; 
+    }, { once: true });
   </script>
 </body>
 </html>

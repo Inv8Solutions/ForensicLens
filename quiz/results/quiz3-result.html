@@ -31,7 +31,7 @@
 <body>
   <div class="wrap">
     <div style="display:flex;justify-content:flex-start;margin-bottom:18px">
-      <button class="back" onclick="window.location.href='index.html'" aria-label="Back">◀</button>
+      <button class="back" onclick="window.location.href='../../index.html'" aria-label="Back">◀</button>
     </div>
 
     <div class="card">
@@ -94,8 +94,11 @@
     document.getElementById('retake').addEventListener('click', ()=>{
       localStorage.removeItem('quiz3_answers');
       window.location.href = '../quiz3.html';
-    });
-    nextBtn.addEventListener('click', ()=>{ window.location.href = '../../modules/module4.html'; });
+    }, { once: true });
+    nextBtn.addEventListener('click', ()=>{ 
+      if(nextBtn.disabled) return;
+      window.location.href = '../../modules/module4.html'; 
+    }, { once: true });
   </script>
 </body>
 </html>
