@@ -389,15 +389,53 @@
 		</style>
 
 			<style>
-				/* Flash toggle visual styles */
-				.flash-toggle { display:flex; align-items:center; gap:8px; justify-content:flex-start; padding:10px 12px; border-radius:12px; background:#171718; border:1px solid #2b2b2b; color:#ddd; font-weight:700; cursor:pointer; width:100%; transition: background 160ms, color 160ms, box-shadow 160ms; }
-				.flash-toggle .indicator { width:14px; height:14px; border-radius:50%; background:#4a4a4a; box-shadow:inset 0 -2px 4px rgba(0,0,0,0.5); border:1px solid #2f2f2f; transition: background 160ms, transform 160ms; }
-				.flash-toggle .label { margin-left:6px; font-size:0.95rem; color:inherit; }
-				/* ON = green (enabled), OFF = red (disabled) */
-				.flash-toggle.on { background: linear-gradient(90deg,#6fe27a,#2fc24a); color:#082308; box-shadow:0 6px 18px rgba(47,194,74,0.12); }
-				.flash-toggle.on .indicator { background: #063a08; transform: scale(1.05); box-shadow:0 2px 8px rgba(0,0,0,0.12); border-color: #0b5a0d; }
-				.flash-toggle.off { background: linear-gradient(90deg,#ff9b9b,#ff4f4f); color:#330606; box-shadow:0 6px 18px rgba(255,79,79,0.10); }
-				.flash-toggle.off .indicator { background: #330606; border-color: #5a0b0b; }
+				/* Oblique lighting toggle visual styles */
+				.oblique-toggle { 
+					display:flex; 
+					align-items:center; 
+					gap:8px; 
+					justify-content:space-between; 
+					padding:10px 12px; 
+					border-radius:12px; 
+					background:#171718; 
+					border:1px solid #2b2b2b; 
+					color:#ddd; 
+					font-weight:700; 
+					cursor:pointer; 
+					width:100%; 
+					transition: background 160ms, color 160ms, box-shadow 160ms; 
+				}
+				.oblique-toggle.active { 
+					background: linear-gradient(90deg,#ffd700,#ffb347); 
+					color:#332200; 
+					box-shadow:0 6px 18px rgba(255,179,71,0.12); 
+				}
+				.three-dots {
+					display: flex;
+					gap: 2px;
+					align-items: center;
+				}
+				.three-dots span {
+					width: 4px;
+					height: 4px;
+					border-radius: 50%;
+					background: currentColor;
+					opacity: 0.7;
+				}
+				.oblique-toggle.active .three-dots span {
+					opacity: 1;
+				}
+				
+				/* Oblique angle selection buttons */
+				.oblique-angle-btn:hover {
+					background: #3a3a3a !important;
+					border-color: #777 !important;
+				}
+				.oblique-angle-btn.active {
+					background: linear-gradient(90deg,#ffd700,#ffb347) !important;
+					color: #332200 !important;
+					border-color: #ffb347 !important;
+				}
 			</style>
 	    <script type="module" src="../algo/firebase.js"></script>
 	    <script src="../algo/algo.js"></script>
@@ -452,6 +490,36 @@
 
 				// Fallback 2D draw if WebGL unavailable
 				const fallbackCtx = !gl ? (canvas.getContext && canvas.getContext('2d')) : null;
+
+				// Image source management for oblique lighting
+				function updateImageSource(angle) {
+					const img = document.getElementById('source-image');
+					if (!img) return;
+					
+					let newSrc;
+					switch(angle) {
+						case '30': newSrc = '../level3/30.png'; break;
+						case '50': newSrc = '../level3/50.png'; break;
+						case '75': newSrc = '../level3/75.png'; break;
+						case '90': newSrc = '../level3/90.png'; break;
+						default: newSrc = '../assets/blood.png'; break; // Original image for 0/off
+					}
+					
+					if (img.src !== newSrc) {
+						img.src = newSrc;
+						// Wait for image to load before re-rendering
+						img.onload = () => {
+							if (gl && programs) {
+								// Update WebGL texture
+								gl.bindTexture(gl.TEXTURE_2D, srcTex);
+								gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+								renderGL(getCurrentValues());
+							} else {
+								scheduleApply();
+							}
+						};
+					}
+				}
 
 				// --- WebGL helpers ---
 				function compileShader(source, type){
@@ -644,9 +712,6 @@
 					const exposureSlider = parseFloat(params.exposure || 0);
 					const totalStops = exposureAdj + isoStops + apertureStops + exposureSlider;
 					let brightness = Math.pow(2, totalStops);
-					if(params.flash){ // flash adds roughly +2 stops (bright quick burst)
-						brightness *= 4.0;
-					}
 					gl.uniform1f(gl.getUniformLocation(programs.final,'u_brightness'), brightness);
 					const noiseStrength = Math.max(0, (isoVal - 100) / 400);
 					gl.uniform1f(gl.getUniformLocation(programs.final,'u_noise'), noiseStrength * 0.06);
@@ -673,7 +738,6 @@
 						shutter: document.getElementById('shutter-slider').value, // seconds
 						iso: document.getElementById('iso-slider').value,
 						exposure: document.getElementById('exposure-slider').value,
-						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on'),
 						oblique: document.getElementById('obliqueBtn') && document.getElementById('obliqueBtn').getAttribute('data-oblique')
 					};
 				}
@@ -802,23 +866,68 @@
 					document.getElementById('shutter-slider').value = 125;
 					document.getElementById('exposure-slider').value = 0;
 					updateLabels(); if(gl && programs) { renderGL(getCurrentValues()); } else { scheduleApply(); }
-					// reset flash visual state
-					const fbtnR = document.getElementById('flashToggle'); if(fbtnR){ fbtnR.classList.remove('on'); fbtnR.classList.add('off'); fbtnR.setAttribute('aria-checked','false'); const s = fbtnR.querySelector('span'); if(s) s.textContent = 'Off'; }
+					// reset oblique lighting state and image
+					const obliqueBtn = document.getElementById('obliqueBtn'); 
+					if(obliqueBtn){ 
+						obliqueBtn.classList.remove('active'); 
+						obliqueBtn.setAttribute('data-oblique','0'); 
+						const s = obliqueBtn.querySelector('span'); 
+						if(s) s.textContent = 'Off'; 
+					}
+					// Reset image to original
+					updateImageSource('0');
 					closeResultModal();
 				});
 
-				// Flash toggle wiring (GL pipeline)
-				const flashBtn = document.getElementById('flashToggle');
-				if(flashBtn){
-					// ensure initial visual state
-					if(!flashBtn.classList.contains('on')){ flashBtn.classList.add('off'); flashBtn.setAttribute('aria-checked','false'); const s0 = flashBtn.querySelector('span'); if(s0) s0.textContent = 'Off'; }
-					flashBtn.addEventListener('click', ()=>{
-						const isOn = flashBtn.classList.toggle('on');
-						flashBtn.classList.toggle('off', !isOn);
-						flashBtn.setAttribute('aria-checked', isOn ? 'true' : 'false');
-						const s = flashBtn.querySelector('span'); if(s) s.textContent = isOn ? 'On' : 'Off';
-						scheduleApply();
+				// Oblique lighting button and modal wiring
+				const obliqueBtn = document.getElementById('obliqueBtn');
+				const obliqueModal = document.getElementById('oblique-modal');
+				
+				if(obliqueBtn && obliqueModal){
+					// Open oblique lighting modal
+					obliqueBtn.addEventListener('click', ()=>{
+						obliqueModal.setAttribute('aria-hidden','false');
 					});
+					
+					// Close oblique lighting modal
+					document.getElementById('oblique-close').addEventListener('click', ()=>{
+						obliqueModal.setAttribute('aria-hidden','true');
+					});
+					
+					// Handle angle selection
+					const angleButtons = obliqueModal.querySelectorAll('.oblique-angle-btn');
+					angleButtons.forEach(btn => {
+						btn.addEventListener('click', ()=>{
+							const angle = btn.getAttribute('data-angle');
+							
+							// Update button states
+							angleButtons.forEach(b => b.classList.remove('active'));
+							btn.classList.add('active');
+							
+							// Update main oblique button
+							obliqueBtn.setAttribute('data-oblique', angle);
+							const label = obliqueBtn.querySelector('span');
+							if(label) {
+								if(angle === '0') {
+									label.textContent = 'Off';
+									obliqueBtn.classList.remove('active');
+								} else {
+									label.textContent = angle + '°';
+									obliqueBtn.classList.add('active');
+								}
+							}
+							
+							// Update image source based on angle
+							updateImageSource(angle);
+							
+							// Close modal
+							obliqueModal.setAttribute('aria-hidden','true');
+						});
+					});
+					
+					// Set initial state for angle 0 (Off)
+					const offBtn = obliqueModal.querySelector('[data-angle="0"]');
+					if(offBtn) offBtn.classList.add('active');
 				}
 			});
 
@@ -871,17 +980,9 @@
 				</div>
 			</div>
 
-				<!-- Global helper to ensure flash toggle reliably updates UI and triggers rendering -->
+				<!-- Global helper to ensure oblique lighting reliably updates UI and triggers rendering -->
 				<script>
-					function toggleFlashUI(e){
-						const btn = document.getElementById('flashToggle');
-						if(!btn) return;
-						const isOn = btn.classList.toggle('on');
-						btn.classList.toggle('off', !isOn);
-						btn.setAttribute('aria-checked', isOn ? 'true' : 'false');
-						const lbl = btn.querySelector('span'); if(lbl) lbl.textContent = isOn ? 'On' : 'Off';
-						// also update indicator styling immediately
-						const ind = btn.querySelector('.indicator'); if(ind){ /* visual handled by CSS classes */ }
+					function updateObliqueUI(){
 						// trigger existing input handlers by dispatching an input event on a slider
 						const ex = document.getElementById('exposure-slider');
 						if(ex){ const ev = new Event('input', { bubbles:true, cancelable:true }); ex.dispatchEvent(ev); }
@@ -891,6 +992,36 @@
 			<div class="fl-actions">
 				<button id="fl-try" class="fl-btn fl-ghost">Try Again</button>
 				<button id="fl-next" class="fl-btn fl-primary">Next Level</button>
+			</div>
+		</div>
+	</div>
+
+	<!-- Oblique Lighting Modal -->
+	<div id="oblique-modal" class="fl-modal-overlay" aria-hidden="true">
+		<div class="fl-modal" role="dialog" aria-modal="true" aria-labelledby="obliqueHeading">
+			<h2 id="obliqueHeading">Oblique Lighting Angle</h2>
+			<p>Select the angle for oblique lighting effect:</p>
+			
+			<div style="display: flex; flex-direction: column; gap: 12px; margin: 20px 0;">
+				<button class="oblique-angle-btn" data-angle="0" style="background: #2b2b2b; color: #fff; border: 1px solid #555; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+					Off (No Oblique Lighting)
+				</button>
+				<button class="oblique-angle-btn" data-angle="30" style="background: #2b2b2b; color: #fff; border: 1px solid #555; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+					30° Oblique Lighting
+				</button>
+				<button class="oblique-angle-btn" data-angle="50" style="background: #2b2b2b; color: #fff; border: 1px solid #555; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+					50° Oblique Lighting
+				</button>
+				<button class="oblique-angle-btn" data-angle="75" style="background: #2b2b2b; color: #fff; border: 1px solid #555; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+					75° Oblique Lighting
+				</button>
+				<button class="oblique-angle-btn" data-angle="90" style="background: #2b2b2b; color: #fff; border: 1px solid #555; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+					90° Oblique Lighting
+				</button>
+			</div>
+
+			<div class="fl-actions">
+				<button id="oblique-close" class="fl-btn fl-ghost">Close</button>
 			</div>
 		</div>
 	</div>
@@ -1000,7 +1131,7 @@
 			}
 
 			// very small gaussian blur approximation using canvas filter when available
-				function applyEffects({aperture, shutter, iso, flash, exposure, oblique}){
+				function applyEffects({aperture, shutter, iso, oblique, exposure}){
 				if(!ctx) return;
 				fitCanvas();
 				// Start from original
@@ -1066,7 +1197,7 @@
 			// initialize image
 				if(img.complete){ drawOriginal(); } else { img.onload = ()=>{ drawOriginal(); }; }
 
-				// For the 2D fallback, avoid duplicating submit/reset/flash logic. The
+				// For the 2D fallback, avoid duplicating submit/reset/oblique logic. The
 				// primary submit/reset wiring above handles evaluation and modal state.
 				if(typeof drawOriginal === 'function' && document.getElementById('resetBtn')){
 					document.getElementById('resetBtn').addEventListener('click', ()=>{
@@ -1074,6 +1205,15 @@
 						document.getElementById('aperture-slider').value = 14;
 						document.getElementById('shutter-slider').value = 1;
 						document.getElementById('exposure-slider').value = 0;
+						// Reset oblique and image
+						const obliqueBtn = document.getElementById('obliqueBtn'); 
+						if(obliqueBtn){ 
+							obliqueBtn.classList.remove('active'); 
+							obliqueBtn.setAttribute('data-oblique','0'); 
+							const s = obliqueBtn.querySelector('span'); 
+							if(s) s.textContent = 'Off'; 
+						}
+						updateImageSource('0');
 						updateLabels(); drawOriginal(); closeResultModal();
 					});
 				}
@@ -1117,14 +1257,16 @@
 						<button class="mode" role="tab" aria-selected="false" data-mode="Tv">Shutter Priority (Tv)</button>
 						<button class="mode" role="tab" aria-selected="false" data-mode="Av">Aperture Priority (Av)</button>
 					</div>
-					<!-- Header: title on the left, flash toggle on the right -->
+					<!-- Header: title on the left, oblique lighting button on the right -->
 					<div class="controls-title" style="display:flex; justify-content:space-between; align-items:center; margin-top: -12px;">
 						<span>Camera Controls</span>
 						<div style="display:flex; align-items:center; gap:8px;">
-							<div class="control-label" style="margin:0; font-size:12px;">Flash</div>
-							<button id="flashToggle" class="flash-toggle" role="switch" aria-checked="false">
-								<div class="indicator" aria-hidden="true"></div>
+							<div class="control-label" style="margin:0; font-size:12px;">Oblique Lighting</div>
+							<button id="obliqueBtn" class="oblique-toggle" role="button" aria-label="Oblique lighting options" data-oblique="0">
 								<span style="margin-left:6px;">Off</span>
+								<div class="three-dots" aria-hidden="true">
+									<span></span><span></span><span></span>
+								</div>
 							</button>
 						</div>
 					</div>
