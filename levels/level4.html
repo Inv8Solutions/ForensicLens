@@ -772,13 +772,21 @@
 					const isoInRange = Math.abs(user.iso - IDEAL_LEVEL4.iso) <= 100;
 					const withinMarginOfError = apertureInRange && shutterInRange && isoInRange;
 					
+					// Check UV light state
+					const uvLightOn = window._lightingType === 'ultraviolet';
+					
+					// Success only if both ideal settings AND UV light is on
+					const successCondition = withinMarginOfError && uvLightOn;
+					
 					return { 
 						delta, 
 						withinTolerance: Math.abs(delta) <= 0.6,
 						apertureInRange,
 						shutterInRange,
 						isoInRange,
-						withinMarginOfError
+						withinMarginOfError,
+						uvLightOn,
+						successCondition
 					};
 				}
 				function computeDesiredExposureLevel4(){
@@ -1118,36 +1126,38 @@
 			// Get the next level button - Level 4 is the final level, so there might not be a next button
 			const nextBtn = document.getElementById('fl-next');
 			
-			// Prioritize margin of error check for icon and message
-			if(result && result.withinMarginOfError) {
-				// All settings within margin - show success
+			// Level 4 requires both ideal settings AND UV light to be on for success
+			if(result && result.successCondition) {
+				// Both ideal settings and UV light on - show success
 				flIcon.className = 'fl-icon success';
 				flIcon.innerHTML = '<i class="fa-solid fa-circle-check" aria-hidden="true"></i>';
 				flHeading.textContent = 'Success!';
-				flMessage.textContent = 'Perfect! The details are clearly documented.';
+				flMessage.textContent = 'Perfect! The fingerprint is clearly documented with UV lighting.';
 			} else {
-				// Settings outside margin - show try again
+				// Either settings wrong or UV light not on - show fail
 				flIcon.className = 'fl-icon fail';
 				flIcon.innerHTML = '<i class="fa-solid fa-circle-xmark" aria-hidden="true"></i>';
 				flHeading.textContent = 'Try Again';
 				
-				if(result && !result.withinMarginOfError) {
-					// Add specific feedback about what's out of range
-					let errorMsg = 'Settings outside acceptable range: ';
-					let errors = [];
-					if(!result.apertureInRange) errors.push('aperture (±1.0)');
-					if(!result.shutterInRange) errors.push('shutter speed (±100)');
-					if(!result.isoInRange) errors.push('ISO (±100)');
-					errorMsg += errors.join(', ');
-					flMessage.textContent = errorMsg;
+				if(result) {
+					// Provide specific feedback based on what's wrong
+					if(result.withinMarginOfError && !result.uvLightOn) {
+						flMessage.textContent = 'Camera settings are correct, but UV lighting is required for fingerprint evidence.';
+					} else if(!result.withinMarginOfError && result.uvLightOn) {
+						flMessage.textContent = 'UV lighting is on, but camera settings need adjustment for proper exposure.';
+					} else if(!result.withinMarginOfError && !result.uvLightOn) {
+						flMessage.textContent = 'Both camera settings and UV lighting need to be adjusted for fingerprint documentation.';
+					} else {
+						flMessage.textContent = 'The image is not correctly exposed. Adjust and try again.';
+					}
 				} else {
 					flMessage.textContent = 'The image is not correctly exposed. Adjust and try again.';
 				}
 			}
 			
-			// Enable/disable next button based on margin of error (if next button exists)
+			// Enable/disable next button based on success condition (if next button exists)
 			if(nextBtn) {
-				if(result && !result.withinMarginOfError) {
+				if(result && !result.successCondition) {
 					nextBtn.style.opacity = '0.5';
 					nextBtn.style.pointerEvents = 'none';
 					nextBtn.style.cursor = 'not-allowed';
