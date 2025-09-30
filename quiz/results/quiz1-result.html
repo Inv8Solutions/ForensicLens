@@ -113,7 +113,8 @@
       lockHelper.style.display = 'none';
     }
 
-    // Modal wiring
+    // Modal wiring - commented out since modal is not in use
+    /*
     const modal = document.getElementById('resultModal');
     const modalPct = document.getElementById('modalPct');
     const modalCorrect = document.getElementById('modalCorrect');
@@ -144,6 +145,7 @@
 
     // Open modal on load
     modal.classList.add('show');
+    */
 
     document.getElementById('retake').addEventListener('click', ()=>{
       localStorage.removeItem('quiz1_answers');
@@ -156,7 +158,8 @@
       window.location.href = '../../modules/module2.html';
     }, { once: true });
 
-    // Modal actions
+    // Modal actions - commented out since modal is not in use
+    /*
     modalProceed.addEventListener('click', ()=>{
       if(window.__clickedNextModule) return; window.__clickedNextModule = true;
       window.location.href = '../../modules/module2.html';
@@ -168,6 +171,7 @@
     modalClose.addEventListener('click', ()=>{
       modal.classList.remove('show');
     }, { once: true });
+    */
   </script>
 </body>
 </html>
