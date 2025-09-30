@@ -1118,16 +1118,31 @@
 			// Get the next level button - Level 4 is the final level, so there might not be a next button
 			const nextBtn = document.getElementById('fl-next');
 			
-			if(ok){
+			// Prioritize margin of error check for icon and message
+			if(result && result.withinMarginOfError) {
+				// All settings within margin - show success
 				flIcon.className = 'fl-icon success';
 				flIcon.innerHTML = '<i class="fa-solid fa-circle-check" aria-hidden="true"></i>';
 				flHeading.textContent = 'Success!';
 				flMessage.textContent = 'Perfect! The details are clearly documented.';
 			} else {
+				// Settings outside margin - show try again
 				flIcon.className = 'fl-icon fail';
 				flIcon.innerHTML = '<i class="fa-solid fa-circle-xmark" aria-hidden="true"></i>';
 				flHeading.textContent = 'Try Again';
-				flMessage.textContent = 'The image is not correctly exposed. Adjust and try again.';
+				
+				if(result && !result.withinMarginOfError) {
+					// Add specific feedback about what's out of range
+					let errorMsg = 'Settings outside acceptable range: ';
+					let errors = [];
+					if(!result.apertureInRange) errors.push('aperture (±1.0)');
+					if(!result.shutterInRange) errors.push('shutter speed (±100)');
+					if(!result.isoInRange) errors.push('ISO (±100)');
+					errorMsg += errors.join(', ');
+					flMessage.textContent = errorMsg;
+				} else {
+					flMessage.textContent = 'The image is not correctly exposed. Adjust and try again.';
+				}
 			}
 			
 			// Enable/disable next button based on margin of error (if next button exists)
@@ -1137,15 +1152,6 @@
 					nextBtn.style.pointerEvents = 'none';
 					nextBtn.style.cursor = 'not-allowed';
 					nextBtn.setAttribute('disabled', 'true');
-					
-					// Add specific feedback about what's out of range
-					let errorMsg = 'Settings outside acceptable range: ';
-					let errors = [];
-					if(!result.apertureInRange) errors.push('aperture (±1.0)');
-					if(!result.shutterInRange) errors.push('shutter speed (±100)');
-					if(!result.isoInRange) errors.push('ISO (±100)');
-					errorMsg += errors.join(', ');
-					flMessage.textContent = errorMsg;
 				} else {
 					nextBtn.style.opacity = '1';
 					nextBtn.style.pointerEvents = 'auto';
