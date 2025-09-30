@@ -73,6 +73,24 @@
     },
     // Restore a snapshot into localStorage
     restore(data){ if(!data) return; Object.entries(data).forEach(([k,v])=> LS.set(k,v)); },
+    
+    // Reset/Clear all progress
+    reset(){
+      const keys = [
+        'module1_done','module2_done','module3_done','module4_done',
+        'practice1_done','practice2_done','practice3_done','practice4_done',
+        'quiz1_score','quiz1_total','quiz1_pass',
+        'quiz2_score','quiz2_total','quiz2_pass',
+        'quiz3_score','quiz3_total','quiz3_pass',
+        'quiz4_score','quiz4_total','quiz4_pass'
+      ];
+      keys.forEach(k => {
+        try { localStorage.removeItem(k); } catch(e) {}
+      });
+      // Also clear from cloud if available
+      try{ if(window.ForensicCloud?.clearProgress) window.ForensicCloud.clearProgress(); }catch(e){}
+    },
+    
     // Markers
   markModuleDone(n){ LS.set(`module${n}_done`, 'true'); try{ window.ForensicCloud?.saveProgress(Progress.snapshot()); }catch(e){} },
   markPracticeDone(n){ LS.set(`practice${n}_done`, 'true'); try{ window.ForensicCloud?.saveProgress(Progress.snapshot()); }catch(e){} },
@@ -179,9 +197,17 @@
   (async function(){
     try{
       if(window.ForensicCloud && window.ForensicCloud._ready){
-        const ok = await window.ForensicCloud._ready; if(!ok) return;
-        const remote = await window.ForensicCloud.loadProgress();
-        if(remote){ Progress.restore(remote); }
+        const ok = await window.ForensicCloud._ready; 
+        if(!ok) return;
+        
+        // Only auto-load for web users, not mobile app users
+        const hasCustomToken = new URLSearchParams(window.location.search).get('fbct') || 
+                              new URLSearchParams(window.location.search).get('customToken');
+        
+        if(!hasCustomToken) {
+          const remote = await window.ForensicCloud.loadProgress();
+          if(remote){ Progress.restore(remote); }
+        }
       }
     }catch(e){ /* ignore hydration errors */ }
 

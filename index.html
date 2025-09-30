@@ -183,6 +183,61 @@
 			vertical-align: middle;
 			margin-left: 2px;
 		}
+		
+		/* Debug panel styles */
+		.debug-panel {
+			position: fixed;
+			bottom: 20px;
+			right: 20px;
+			background: var(--card-bg);
+			border: 2px solid var(--card-border);
+			border-radius: 12px;
+			padding: 16px;
+			min-width: 200px;
+			z-index: 1000;
+			display: none;
+		}
+		.debug-panel.show { display: block; }
+		.debug-panel h4 {
+			margin: 0 0 12px 0;
+			color: var(--text-main);
+			font-size: 1rem;
+		}
+		.debug-panel button {
+			background: var(--button-bg);
+			color: var(--button-text);
+			border: none;
+			border-radius: 8px;
+			padding: 8px 12px;
+			margin: 4px 0;
+			cursor: pointer;
+			width: 100%;
+			font-size: 0.9rem;
+		}
+		.debug-panel button:hover {
+			background: var(--button-bg-hover);
+		}
+		.debug-panel .info {
+			color: var(--text-sub);
+			font-size: 0.8rem;
+			margin: 8px 0;
+		}
+		.debug-toggle {
+			position: fixed;
+			bottom: 20px;
+			left: 20px;
+			background: var(--card-bg);
+			border: 1px solid var(--card-border);
+			border-radius: 50%;
+			width: 40px;
+			height: 40px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+			z-index: 1001;
+			color: var(--text-sub);
+		}
 		@media (max-width: 480px) {
 			.container {
 				padding: 24px 4vw 0 4vw;
@@ -284,6 +339,21 @@
 		</div>
 	</div>
 
+	<!-- Debug Panel for Testing -->
+	<div class="debug-toggle" onclick="toggleDebugPanel()" title="Debug Panel">🔧</div>
+	<div id="debug-panel" class="debug-panel">
+		<h4>Debug Panel</h4>
+		<div class="info">
+			<div>User ID: <span id="debug-uid">Not signed in</span></div>
+			<div>Auth Type: <span id="debug-auth-type">Unknown</span></div>
+		</div>
+		<button onclick="clearAllProgress()">Clear All Progress</button>
+		<button onclick="loadRemoteProgress()">Load Remote Progress</button>
+		<button onclick="showProgressInfo()">Show Progress Info</button>
+		<button onclick="simulateNewUser()">Simulate New User</button>
+		<button onclick="window.location.reload()">Refresh Page</button>
+	</div>
+
 		<!-- Cloud progress (Firebase) and progression engine -->
 		<script type="module" src="./algo/firebase.js"></script>
 		<script src="./algo/algo.js"></script>
@@ -369,6 +439,73 @@
 				// Update if another tab updates storage (defensive)
 				window.addEventListener('storage', applyProgress);
 			})();
+
+			// Debug panel functionality
+			function toggleDebugPanel() {
+				const panel = document.getElementById('debug-panel');
+				panel.classList.toggle('show');
+				updateDebugInfo();
+			}
+
+			function updateDebugInfo() {
+				const uidEl = document.getElementById('debug-uid');
+				const authTypeEl = document.getElementById('debug-auth-type');
+				
+				if(window.ForensicCloud) {
+					const uid = window.ForensicCloud.getUid();
+					uidEl.textContent = uid || 'Not signed in';
+					
+					// Check if using custom token (from URL or mobile app)
+					const hasCustomToken = new URLSearchParams(window.location.search).get('fbct') || 
+					                      new URLSearchParams(window.location.search).get('customToken');
+					authTypeEl.textContent = hasCustomToken ? 'Custom Token (Mobile)' : 'Anonymous (Web)';
+				}
+			}
+
+			async function clearAllProgress() {
+				if(confirm('This will clear ALL progress. Are you sure?')) {
+					try {
+						if(window.ForensicFlow && typeof window.ForensicFlow.reset === 'function') {
+							window.ForensicFlow.reset();
+						}
+						if(window.ForensicCloud && typeof window.ForensicCloud.clearProgress === 'function') {
+							await window.ForensicCloud.clearProgress();
+						} else {
+							window.location.reload();
+						}
+					} catch(e) {
+						alert('Error clearing progress: ' + e.message);
+					}
+				}
+			}
+
+			async function loadRemoteProgress() {
+				try {
+					if(window.ForensicCloud && typeof window.ForensicCloud.forceLoadProgress === 'function') {
+						const success = await window.ForensicCloud.forceLoadProgress();
+						alert(success ? 'Progress loaded from cloud' : 'No remote progress found');
+						if(success) window.location.reload();
+					} else {
+						alert('Cloud not available');
+					}
+				} catch(e) {
+					alert('Error loading progress: ' + e.message);
+				}
+			}
+
+			function showProgressInfo() {
+				const { modules, practices, quizzes, pct, done } = countProgress();
+				alert(`Progress Info:\nModules: ${modules}/4\nPractice: ${practices}/4\nQuizzes: ${quizzes}/4\nTotal: ${done}/12 (${pct}%)`);
+			}
+
+			async function simulateNewUser() {
+				if(confirm('This will simulate a completely new user (clear everything). Continue?')) {
+					await clearAllProgress();
+				}
+			}
+
+			// Update debug info when auth state changes
+			window.addEventListener('forensic-auth', updateDebugInfo);
 		</script>
 </body>
 </html>

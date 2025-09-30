@@ -58,22 +58,32 @@ const ready = new Promise((resolve) => {
     if (user) {
       state.uid = user.uid;
       try{
-        // Load remote progress
+        // Only auto-restore progress if this is a returning web user (not mobile app)
+        const isCustomToken = getTokenFromUrl() !== null;
         let remote = null;
-        try { const ref = doc(db, 'users', state.uid); const snap = await getDoc(ref); remote = snap.exists()? (snap.data()?.progress || null) : null; } catch (_) { /* ignore */ }
+        
+        if(!isCustomToken) {
+          // Web user - load their existing progress
+          try { const ref = doc(db, 'users', state.uid); const snap = await getDoc(ref); remote = snap.exists()? (snap.data()?.progress || null) : null; } catch (_) { /* ignore */ }
+        }
+        // For mobile app users (custom token), don't auto-restore - let the app decide
+        
         // Merge with any pending local snapshot saved before auth
         const merged = pendingProgress ? { ...(remote || {}), ...pendingProgress } : (remote || null);
-        if(merged && window.ForensicFlow && typeof window.ForensicFlow.restore === 'function'){
+        
+        // Only restore progress automatically for web users
+        if(merged && !isCustomToken && window.ForensicFlow && typeof window.ForensicFlow.restore === 'function'){
           window.ForensicFlow.restore(merged);
         }
+        
         // If there was pending progress, flush it to Firestore and clear buffer
         if(pendingProgress){
           try{ const ref = doc(db, 'users', state.uid); await setDoc(ref, { progress: merged, updatedAt: serverTimestamp() }, { merge: true }); }catch(_){ /* ignore */ }
           pendingProgress = null;
         }
         // Notify listeners/subscribers
-        try{ window.dispatchEvent(new CustomEvent('forensic-auth', { detail: { uid: user.uid } })); }catch(_){}
-        try{ if(merged) window.dispatchEvent(new CustomEvent('forensic-progress-restored', { detail: { uid: user.uid, progress: merged } })); }catch(_){ }
+        try{ window.dispatchEvent(new CustomEvent('forensic-auth', { detail: { uid: user.uid, isCustomToken } })); }catch(_){}
+        try{ if(merged && !isCustomToken) window.dispatchEvent(new CustomEvent('forensic-progress-restored', { detail: { uid: user.uid, progress: merged } })); }catch(_){ }
       }catch(e){ /* ignore */ }
       resolve(true);
     }
@@ -117,10 +127,58 @@ async function loadProgress() {
   }
 }
 
+async function clearProgress() {
+  try {
+    // Clear local storage
+    if(window.ForensicFlow && typeof window.ForensicFlow.snapshot === 'function') {
+      const keys = Object.keys(window.ForensicFlow.snapshot());
+      keys.forEach(key => {
+        try { localStorage.removeItem(key); } catch(_) {}
+      });
+    }
+    
+    // Clear Firebase if authenticated
+    const ok = await ready; 
+    if(ok && db && state.uid) {
+      const ref = doc(db, 'users', state.uid);
+      await setDoc(ref, { 
+        progress: {}, 
+        updatedAt: serverTimestamp(),
+        clearedAt: serverTimestamp() 
+      }, { merge: true });
+    }
+    
+    // Refresh the page to reset UI state
+    window.location.reload();
+    return true;
+  } catch (e) {
+    console.warn('clearProgress failed', e); 
+    return false;
+  }
+}
+
+async function forceLoadProgress() {
+  try {
+    const progress = await loadProgress();
+    if(progress && window.ForensicFlow && typeof window.ForensicFlow.restore === 'function') {
+      window.ForensicFlow.restore(progress);
+      // Trigger UI update
+      try{ window.dispatchEvent(new CustomEvent('forensic-progress-restored', { detail: { uid: state.uid, progress } })); }catch(_){ }
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.warn('forceLoadProgress failed', e); 
+    return false;
+  }
+}
+
 window.ForensicCloud = {
   getUid: () => state.uid,
   saveProgress,
   loadProgress,
+  clearProgress,
+  forceLoadProgress,
   // Sign in with a Firebase custom token provided by native app
   signInWithCustomToken: async (token) => {
     try {
@@ -136,15 +194,33 @@ window.ForensicCloud = {
   _ready: ready
 };
 
-// Also accept custom token via postMessage from Android WebView
+// Also accept custom token and commands via postMessage from Android WebView
 try{
   window.addEventListener('message', async (evt)=>{
     try{
       const data = evt?.data;
-      if(data && (data.type === 'FORNS_CLD_CUSTOM_TOKEN' || data.type === 'FIREBASE_CUSTOM_TOKEN')){
+      if(!data || typeof data !== 'object') return;
+      
+      // Handle custom token for authentication
+      if(data.type === 'FORNS_CLD_CUSTOM_TOKEN' || data.type === 'FIREBASE_CUSTOM_TOKEN'){
         const token = data.token;
         if(token){ await window.ForensicCloud.signInWithCustomToken(token); }
       }
-    }catch(e){ /* ignore */ }
+      
+      // Handle progress management commands from mobile app
+      else if(data.type === 'FORNS_CLEAR_PROGRESS') {
+        await window.ForensicCloud.clearProgress();
+      }
+      
+      else if(data.type === 'FORNS_LOAD_PROGRESS') {
+        await window.ForensicCloud.forceLoadProgress();
+      }
+      
+      else if(data.type === 'FORNS_RESET_NEW_USER') {
+        // Special command for mobile app to reset everything for a new user
+        await window.ForensicCloud.clearProgress();
+      }
+      
+    }catch(e){ console.warn('Message handler error:', e); }
   });
 }catch(e){ /* ignore */ }
