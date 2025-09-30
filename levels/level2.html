@@ -758,7 +758,29 @@
 					const u = stopsForSettingsLevel2(user);
 					const ideal = stopsForSettingsLevel2({ iso: IDEAL_VEHICLE_NIGHT.iso, aperture: IDEAL_VEHICLE_NIGHT.aperture, shutter: IDEAL_VEHICLE_NIGHT.shutter, exposure:0 });
 					const delta = u.totalStops - ideal.totalStops;
-					return { delta, userStops: u, idealStops: ideal, withinTolerance: Math.abs(delta) <= 0.7 };
+					
+					// New margin of error validation
+					const apertureError = Math.abs(parseFloat(user.aperture) - IDEAL_VEHICLE_NIGHT.aperture);
+					const shutterError = Math.abs(parseFloat(user.shutter) - IDEAL_VEHICLE_NIGHT.shutter);
+					const isoError = Math.abs(parseFloat(user.iso) - IDEAL_VEHICLE_NIGHT.iso);
+					
+					const apertureInRange = apertureError <= 1.0; // ±1 for aperture
+					const shutterInRange = shutterError <= 100; // ±100 for shutter
+					const isoInRange = isoError <= 100; // ±100 for ISO
+					
+					const withinMarginOfError = apertureInRange && shutterInRange && isoInRange;
+					const oldWithinTolerance = Math.abs(delta) <= 0.7; // Keep old logic for general feedback
+					
+					return { 
+						delta, 
+						userStops: u, 
+						idealStops: ideal, 
+						withinTolerance: oldWithinTolerance,
+						withinMarginOfError: withinMarginOfError,
+						apertureInRange,
+						shutterInRange,
+						isoInRange
+					};
 				}
 
 				// Submit opens modal and evaluates by stops (Level 2)
@@ -766,7 +788,7 @@
 					const user = getCurrentValues();
 					if(gl && programs) renderGL(user); else scheduleApply();
 					const result = evaluateUserLevel2(user);
-					openResultModal({ ok: result.withinTolerance, user, ideal: IDEAL_VEHICLE_NIGHT });
+					openResultModal({ ok: result.withinTolerance, user, ideal: IDEAL_VEHICLE_NIGHT, result });
 					if(!result.withinTolerance){
 						const diff = result.delta;
 						const msg = diff > 0 ? 'Image likely overexposed by ~' + diff.toFixed(2) + ' stops.' : 'Image likely underexposed by ~' + Math.abs(diff).toFixed(2) + ' stops.';
@@ -890,8 +912,12 @@
 		const flApUser = document.getElementById('fl-ap-user');
 		const flShUser = document.getElementById('fl-sh-user');
 
-		function openResultModal({ok, user, ideal}){
+		function openResultModal({ok, user, ideal, result}){
 			modal.setAttribute('aria-hidden','false');
+			
+			// Get the next level button
+			const nextBtn = document.getElementById('fl-next');
+			
 			if(ok){
 				flIcon.className = 'fl-icon success';
 				flIcon.innerHTML = '<i class="fa-solid fa-circle-check" aria-hidden="true"></i>';
@@ -903,6 +929,29 @@
 				flHeading.textContent = 'Try Again';
 				flMessage.textContent = 'The image is not correctly exposed. Adjust and try again.';
 			}
+			
+			// Enable/disable next button based on margin of error
+			if(result && !result.withinMarginOfError) {
+				nextBtn.style.opacity = '0.5';
+				nextBtn.style.pointerEvents = 'none';
+				nextBtn.style.cursor = 'not-allowed';
+				nextBtn.setAttribute('disabled', 'true');
+				
+				// Add specific feedback about what's out of range
+				let errorMsg = 'Settings outside acceptable range: ';
+				let errors = [];
+				if(!result.apertureInRange) errors.push('aperture (±1.0)');
+				if(!result.shutterInRange) errors.push('shutter speed (±100)');
+				if(!result.isoInRange) errors.push('ISO (±100)');
+				errorMsg += errors.join(', ');
+				flMessage.textContent = errorMsg;
+			} else {
+				nextBtn.style.opacity = '1';
+				nextBtn.style.pointerEvents = 'auto';
+				nextBtn.style.cursor = 'pointer';
+				nextBtn.removeAttribute('disabled');
+			}
+			
 			flIsoUser.textContent = 'ISO: ' + user.iso;
 			flApUser.textContent = 'Aperture: f/' + user.aperture;
 			flShUser.textContent = 'Shutter: 1/' + user.shutter + 's';
