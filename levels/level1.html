@@ -1044,6 +1044,24 @@
 				nextBtn.removeAttribute('disabled');
 			}
 			
+			// Show/hide ideal settings based on margin of error
+			const settingsContainer = document.querySelector('.fl-settings');
+			const idealCol = settingsContainer.querySelector('.fl-col:last-child'); // Second column (Ideal Settings)
+			
+			if(result && !result.withinMarginOfError) {
+				// Hide ideal settings when outside margin of error
+				if(idealCol) idealCol.style.display = 'none';
+				// Center the user settings column
+				const userCol = settingsContainer.querySelector('.fl-col:first-child');
+				if(userCol) userCol.style.margin = '0 auto';
+			} else {
+				// Show ideal settings when within margin of error
+				if(idealCol) idealCol.style.display = 'block';
+				// Reset user settings column alignment
+				const userCol = settingsContainer.querySelector('.fl-col:first-child');
+				if(userCol) userCol.style.margin = '';
+			}
+			
 			flIsoUser.textContent = 'ISO: ' + user.iso;
 			flApUser.textContent = 'Aperture: f/' + user.aperture;
 			flShUser.textContent = 'Shutter: 1/' + user.shutter + 's';
