@@ -219,6 +219,28 @@
 			height: 4px;
 			margin: 0;
 		}
+		/* Exposure meter styles */
+		.meter-container {
+			width: 100%;
+			height: 24px;
+			background: linear-gradient(to right, #333, #666);
+			border-radius: 12px;
+			position: relative;
+			margin: 8px 0;
+			border: 1px solid #555;
+		}
+		.meter-indicator {
+			position: absolute;
+			top: 2px;
+			width: 20px;
+			height: 20px;
+			background: #ff3b3f;
+			border-radius: 50%;
+			transform: translateX(-50%);
+			transition: left 0.2s ease;
+			border: 2px solid #fff;
+			box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+		}
 		.slider-labels {
 			width: 95%;
 			display: flex;
@@ -690,11 +712,24 @@
 				function getCurrentValues(){
 					const obBtn = document.getElementById('obliqueBtn');
 					const ob = obBtn && obBtn.getAttribute('data-oblique') ? obBtn.getAttribute('data-oblique') : null;
+					
+					// Calculate automatic exposure based on camera settings
+					const aperture = parseFloat(document.getElementById('aperture-slider').value);
+					const shutter = parseFloat(document.getElementById('shutter-slider').value);
+					const iso = parseFloat(document.getElementById('iso-slider').value);
+					
+					// Calculate exposure value based on aperture, shutter speed, and ISO
+					// Using the same baseline as IDEAL_GUN settings: ISO 400, aperture f/11, shutter 1/125
+					const apertureStops = Math.log2(aperture * aperture / (11.0 * 11.0)); // relative to f/11 (ideal)
+					const shutterStops = Math.log2(shutter / 125); // relative to 1/125 (ideal)
+					const isoStops = Math.log2(iso / 400); // relative to ISO 400 (ideal)
+					const calculatedExposure = apertureStops + shutterStops - isoStops;
+					
 					return {
-						aperture: document.getElementById('aperture-slider').value,
-						shutter: document.getElementById('shutter-slider').value,
-						iso: document.getElementById('iso-slider').value,
-						exposure: document.getElementById('exposure-slider').value,
+						aperture: aperture,
+						shutter: shutter,
+						iso: iso,
+						exposure: calculatedExposure,
 						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on'),
 						oblique: ob
 					};
@@ -704,6 +739,22 @@
 					const ap = document.getElementById('aperture-val'); if(ap) ap.textContent = 'f/' + document.getElementById('aperture-slider').value;
 					const sh = document.getElementById('shutter-val'); if(sh) sh.textContent = '1/' + document.getElementById('shutter-slider').value;
 					const iso = document.getElementById('iso-val'); if(iso) iso.textContent = document.getElementById('iso-slider').value;
+					updateExposureIndicator();
+				}
+
+				function updateExposureIndicator(){
+					const indicator = document.getElementById('exposure-indicator');
+					if(!indicator) return;
+					
+					const values = getCurrentValues();
+					const exposure = values.exposure;
+					
+					// Map exposure value (-3 to +3 range) to position (0% to 100%)
+					// Clamp the exposure to the -3 to +3 range for display
+					const clampedExposure = Math.max(-3, Math.min(3, exposure));
+					const position = ((clampedExposure + 3) / 6) * 100; // Map -3..+3 to 0..100
+					
+					indicator.style.left = position + '%';
 				}
 
 				// Compute desired exposure slider value needed to match the IDEAL stops
@@ -735,24 +786,34 @@
 					const result = evaluateUser(vals);
 					const lbl = document.querySelector('.exposure-label span');
 					if(!lbl) return;
-					const delta = result.delta;
-					if(Math.abs(delta) <= 0.6){ lbl.textContent = 'GOOD EXPOSURE'; lbl.style.color = '#9be89b'; }
-					else if(delta > 0){ lbl.textContent = 'OVEREXPOSED'; lbl.style.color = '#ffb86b'; }
-					else { lbl.textContent = 'UNDEREXPOSED'; lbl.style.color = '#ff5c5c'; }
+					
+					// Use the automatic exposure calculation for feedback
+					const exposure = vals.exposure; // This is now the calculated exposure
+					
+					// Provide feedback based on the calculated exposure value
+					if(Math.abs(exposure) <= 0.6){ 
+						lbl.textContent = 'GOOD EXPOSURE'; 
+						lbl.style.color = '#9be89b'; 
+					}
+					else if(exposure > 0.6){ 
+						lbl.textContent = 'OVEREXPOSED'; 
+						lbl.style.color = '#ffb86b'; 
+					}
+					else { 
+						lbl.textContent = 'UNDEREXPOSED'; 
+						lbl.style.color = '#ff5c5c'; 
+					}
+					
+					// Also update the indicator position
+					updateExposureIndicator();
 				}
 
-				['aperture-slider','shutter-slider','iso-slider','exposure-slider'].forEach(id=>{
+				['aperture-slider','shutter-slider','iso-slider'].forEach(id=>{
 					const el = document.getElementById(id);
 					if(!el) return;
 					el.addEventListener('input', (e)=>{
 						// update labels first
 						updateLabels();
-						if(id !== 'exposure-slider'){
-							// when user changes aperture/shutter/iso, compute desired exposure to reach ideal
-							const desired = computeDesiredExposure();
-							const exEl = document.getElementById('exposure-slider');
-							if(exEl){ exEl.value = desired; }
-						}
 						// apply changes
 						scheduleApply();
 						// refresh exposure meter text based on current composed settings
@@ -835,7 +896,6 @@
 					document.getElementById('iso-slider').value = 400;
 					document.getElementById('aperture-slider').value = 8;
 					document.getElementById('shutter-slider').value = 125;
-					document.getElementById('exposure-slider').value = 0;
 					updateLabels(); if(gl && programs) { renderGL(getCurrentValues()); } else { scheduleApply(); }
 					// reset flash visual state
 					const fbtnR = document.getElementById('flashToggle'); if(fbtnR){ fbtnR.classList.remove('on'); fbtnR.classList.add('off'); fbtnR.setAttribute('aria-checked','false'); const s = fbtnR.querySelector('span'); if(s) s.textContent = 'Off'; }
@@ -856,21 +916,6 @@
 					});
 				}
 			});
-
-			// Exposure slider live update
-			(function(){
-				const ex = document.getElementById('exposure-slider');
-				const lbl = document.querySelector('.exposure-label span');
-				if(!ex || !lbl) return;
-				function updateExposure(v) {
-					const val = parseFloat(v);
-					if(val <= -1.2) { lbl.textContent = 'UNDEREXPOSED'; lbl.style.color = '#ff5c5c'; }
-					else if(val >= 1.2) { lbl.textContent = 'OVEREXPOSED'; lbl.style.color = '#ffb86b'; }
-					else { lbl.textContent = 'GOOD EXPOSURE'; lbl.style.color = '#9be89b'; }
-				}
-				updateExposure(ex.value);
-				ex.addEventListener('input', (e)=>{ updateExposure(e.target.value); });
-			})();
 
 		// Prevent portrait mode scrolling
 		window.addEventListener('orientationchange', function() {
@@ -923,15 +968,13 @@
 						const lbl = btn.querySelector('span'); if(lbl) lbl.textContent = isOn ? 'On' : 'Off';
 						// also update indicator styling immediately
 						const ind = btn.querySelector('.indicator'); if(ind){ /* visual handled by CSS classes */ }
-						// trigger existing input handlers by dispatching an input event on a slider
-						const ex = document.getElementById('exposure-slider');
-						if(ex){ const ev = new Event('input', { bubbles:true, cancelable:true }); ex.dispatchEvent(ev); }
-						// also trigger a render update if available
+						// trigger render update and exposure meter update
 						try{
 							if(typeof scheduleApply === 'function') scheduleApply();
+							if(typeof updateExposureMeter === 'function') updateExposureMeter();
 							else if(typeof renderGL === 'function') {
 								// attempt to render using current values
-								const getVals = window.getCurrentValues || function(){ return { aperture: document.getElementById('aperture-slider').value, shutter: document.getElementById('shutter-slider').value, iso: document.getElementById('iso-slider').value, exposure: document.getElementById('exposure-slider').value, flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on') }; };
+								const getVals = window.getCurrentValues || function(){ return { aperture: document.getElementById('aperture-slider').value, shutter: document.getElementById('shutter-slider').value, iso: document.getElementById('iso-slider').value, exposure: 0, flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on') }; };
 								renderGL(getVals());
 							}
 						}catch(e){ /* ignore if render functions not accessible in this scope */ }
@@ -1153,7 +1196,9 @@
 					<div class="exposure-label">Exposure Meter: <span>GOOD EXPOSURE</span></div>
 					<div class="exposure-slider">
 						<div class="slider-track">
-							<input id="exposure-slider" type="range" min="-3" max="3" value="0" step="0.1" class="slider">
+							<div class="meter-container">
+								<div id="exposure-indicator" class="meter-indicator" style="left: 50%;"></div>
+							</div>
 						</div>
 						<div class="ticks" aria-hidden="true">
 							<span style="left:0%"></span><label style="left:0%">-3</label>
@@ -1238,15 +1283,14 @@
 				const ap = document.getElementById('aperture-slider');
 				const sh = document.getElementById('shutter-slider');
 				const iso = document.getElementById('iso-slider');
-				const ex = document.getElementById('exposure-slider');
 				if(mode === 'M'){
-					[ap, sh, iso, ex].forEach(el => setDisabled(el, false));
+					[ap, sh, iso].forEach(el => setDisabled(el, false));
 				}else if(mode === 'Tv'){
 					setDisabled(sh, false);
-					[ap, iso, ex].forEach(el => setDisabled(el, true));
+					[ap, iso].forEach(el => setDisabled(el, true));
 				}else if(mode === 'Av'){
 					setDisabled(ap, false);
-					[sh, iso, ex].forEach(el => setDisabled(el, true));
+					[sh, iso].forEach(el => setDisabled(el, true));
 				}
 				try{ if(typeof scheduleApply === 'function') scheduleApply(); }catch(e){}
 			}
