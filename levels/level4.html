@@ -901,7 +901,7 @@
 					const user = getCurrentValues();
 					if(gl && programs) renderGL(user); else scheduleApply();
 					const result = evaluateUserLevel4(user);
-					const ev = parseFloat(document.getElementById('exposure-slider').value);
+					const ev = user.exposure; // Use calculated exposure from getCurrentValues()
 					const ok = Math.abs(ev) <= 0.6;
 					openResultModal({ok, user, ideal: IDEAL_LEVEL4, result});
 				});
@@ -1414,15 +1414,10 @@
 
 				// wire submit to apply effects and open result modal (2D fallback)
 				document.getElementById('submitBtn').addEventListener('click', ()=>{
-					const user = {
-						iso: document.getElementById('iso-slider').value,
-						aperture: document.getElementById('aperture-slider').value,
-						shutter: document.getElementById('shutter-slider').value,
-						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on')
-					};
+					const user = getCurrentValues();
 					applyEffects(user);
 					const result = evaluateUserLevel4(user);
-					const ev2 = parseFloat(document.getElementById('exposure-slider').value);
+					const ev2 = user.exposure; // Use calculated exposure from getCurrentValues()
 					const ok2 = Math.abs(ev2) <= 0.6;
 					openResultModal({ok: ok2, user, ideal: IDEAL_LEVEL4, result});
 				});
