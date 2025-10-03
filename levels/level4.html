@@ -220,6 +220,28 @@
 			height: 4px;
 			margin: 0;
 		}
+		/* Exposure meter styles */
+		.meter-container {
+			width: 100%;
+			height: 24px;
+			background: linear-gradient(to right, #333, #666);
+			border-radius: 12px;
+			position: relative;
+			margin: 8px 0;
+			border: 1px solid #555;
+		}
+		.meter-indicator {
+			position: absolute;
+			top: 2px;
+			width: 20px;
+			height: 20px;
+			background: #ff3b3f;
+			border-radius: 50%;
+			transform: translateX(-50%);
+			transition: left 0.2s ease;
+			border: 2px solid #fff;
+			box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+		}
 		.slider-labels {
 			width: 95%;
 			display: flex;
@@ -760,13 +782,37 @@
 				window.scheduleApply = scheduleApply;
 
 				function getCurrentValues(){
+					const iso = parseFloat(document.getElementById('iso-slider').value);
+					const aperture = parseFloat(document.getElementById('aperture-slider').value);
+					const shutter = parseFloat(document.getElementById('shutter-slider').value);
+					
+					// Calculate exposure automatically based on difference from ideal settings
+					const cur = stopsForSettingsLevel4({ iso, aperture, shutter, exposure: 0 });
+					const ideal = stopsForSettingsLevel4({ iso: IDEAL_LEVEL4.iso, aperture: IDEAL_LEVEL4.aperture, shutter: IDEAL_LEVEL4.shutter, exposure: 0 });
+					const exposure = ideal.totalStops - cur.totalStops;
+					
 					return {
-						aperture: document.getElementById('aperture-slider').value,
-						shutter: document.getElementById('shutter-slider').value,
-						iso: document.getElementById('iso-slider').value,
-						exposure: document.getElementById('exposure-slider').value,
+						aperture: aperture,
+						shutter: shutter,
+						iso: iso,
+						exposure: exposure,
 						flash: document.getElementById('flashToggle') && document.getElementById('flashToggle').classList.contains('on')
 					};
+				}
+
+				function updateExposureIndicator() {
+					const vals = getCurrentValues();
+					const exposure = vals.exposure;
+					
+					// Position indicator based on exposure value (-3 to +3 range)
+					const minExp = -3, maxExp = 3;
+					const clampedExp = Math.max(minExp, Math.min(maxExp, exposure));
+					const percentage = ((clampedExp - minExp) / (maxExp - minExp)) * 100;
+					
+					const indicator = document.querySelector('.meter-indicator');
+					if (indicator) {
+						indicator.style.left = percentage + '%';
+					}
 				}
 
 				function updateLabels(){
@@ -815,18 +861,6 @@
 						successCondition
 					};
 				}
-				function computeDesiredExposureLevel4(){
-					const iso = parseFloat(document.getElementById('iso-slider').value);
-					const aperture = parseFloat(document.getElementById('aperture-slider').value);
-					const shutter = parseFloat(document.getElementById('shutter-slider').value);
-					const cur = stopsForSettingsLevel4({ iso, aperture, shutter, exposure: 0 });
-					const ideal = stopsForSettingsLevel4({ iso: IDEAL_LEVEL4.iso, aperture: IDEAL_LEVEL4.aperture, shutter: IDEAL_LEVEL4.shutter, exposure: 0 });
-					let needed = ideal.totalStops - cur.totalStops;
-					const exEl = document.getElementById('exposure-slider');
-					if(exEl){ const min = parseFloat(exEl.getAttribute('min') || -3); const max = parseFloat(exEl.getAttribute('max') || 3);
-						if(needed < min) needed = min; if(needed > max) needed = max; needed = Math.round(needed * 10)/10; }
-					return needed;
-				}
 				function updateExposureMeterLevel4(){
 					const vals = getCurrentValues();
 					const r = evaluateUserLevel4(vals);
@@ -834,17 +868,16 @@
 					if(Math.abs(r.delta) <= 0.6){ lbl.textContent = 'GOOD EXPOSURE'; lbl.style.color = '#9be89b'; }
 					else if(r.delta > 0){ lbl.textContent = 'OVEREXPOSED'; lbl.style.color = '#ffb86b'; }
 					else { lbl.textContent = 'UNDEREXPOSED'; lbl.style.color = '#ff5c5c'; }
+					
+					// Update the visual meter indicator
+					updateExposureIndicator();
 				}
 
-				['aperture-slider','shutter-slider','iso-slider','exposure-slider'].forEach(id=>{
+				['aperture-slider','shutter-slider','iso-slider'].forEach(id=>{
 					const el = document.getElementById(id);
 					if(!el) return;
 					el.addEventListener('input', ()=>{
 						updateLabels();
-						if(id !== 'exposure-slider'){
-							const desired = computeDesiredExposureLevel4();
-							const exEl = document.getElementById('exposure-slider'); if(exEl) exEl.value = desired;
-						}
 						scheduleApply();
 						updateExposureMeterLevel4();
 					});
@@ -859,7 +892,9 @@
 					if(img.complete){ if(programs==null) initGLResources(); scheduleApply(); }
 				}
 
-				updateLabels(); scheduleApply();
+				updateLabels(); 
+				updateExposureMeterLevel4();
+				scheduleApply();
 
 				// Submit opens modal but image updates in real-time already
 				document.getElementById('submitBtn').addEventListener('click', ()=>{
@@ -876,8 +911,9 @@
 					document.getElementById('iso-slider').value = 600;
 					document.getElementById('aperture-slider').value = 8;
 					document.getElementById('shutter-slider').value = 125;
-					document.getElementById('exposure-slider').value = 0;
-					updateLabels(); if(gl && programs) { renderGL(getCurrentValues()); } else { scheduleApply(); }
+					updateLabels(); 
+					updateExposureMeterLevel4();
+					if(gl && programs) { renderGL(getCurrentValues()); } else { scheduleApply(); }
 					// reset flash visual state
 					const fbtnR = document.getElementById('flashToggle'); if(fbtnR){ fbtnR.classList.remove('on'); fbtnR.classList.add('off'); fbtnR.setAttribute('aria-checked','false'); const s = fbtnR.querySelector('span'); if(s) s.textContent = 'Off'; }
 					// clear lighting selection and canvas filters
@@ -1263,7 +1299,23 @@
 			flIsoUser.textContent = 'ISO: ' + user.iso;
 			flApUser.textContent = 'Aperture: f/' + user.aperture;
 			flShUser.textContent = 'Shutter: 1/' + user.shutter + 's';
-			// TODO: populate ideal values if provided
+			
+			// Find the ideal settings column
+			const idealCol = document.querySelector('.fl-col:last-child');
+			
+			if(result && result.successCondition) {
+				// Show ideal settings on success and populate them
+				if(idealCol) idealCol.style.display = 'block';
+				const flIsoIdeal = document.getElementById('fl-iso-ideal');
+				const flApIdeal = document.getElementById('fl-ap-ideal');
+				const flShIdeal = document.getElementById('fl-sh-ideal');
+				if(flIsoIdeal) flIsoIdeal.textContent = 'ISO: ' + ideal.iso;
+				if(flApIdeal) flApIdeal.textContent = 'Aperture: f/' + ideal.aperture;
+				if(flShIdeal) flShIdeal.textContent = 'Shutter: 1/' + ideal.shutter + 's';
+			} else {
+				// Hide ideal settings on failure
+				if(idealCol) idealCol.style.display = 'none';
+			}
 		}
 		function closeResultModal(){ modal.setAttribute('aria-hidden','true'); }
 
@@ -1378,6 +1430,7 @@
 				// reset handler for 2D fallback
 				document.getElementById('resetBtn').addEventListener('click', ()=>{
 					drawOriginal();
+					updateExposureMeterLevel4();
 					const fbtn = document.getElementById('flashToggle'); if(fbtn){ fbtn.classList.remove('on'); fbtn.classList.add('off'); fbtn.setAttribute('aria-checked','false'); const s = fbtn.querySelector('span'); if(s) s.textContent = 'Off'; }
 					// clear lighting selection and canvas filters
 					const modal = document.getElementById('moreOptionsModal');
@@ -1444,7 +1497,9 @@
 					<div class="exposure-label">Exposure Meter: <span>GOOD EXPOSURE</span></div>
 					<div class="exposure-slider">
 						<div class="slider-track">
-							<input id="exposure-slider" type="range" min="-3" max="3" value="0" step="0.1" class="slider">
+							<div class="meter-container">
+								<div id="exposure-indicator" class="meter-indicator" style="left: 50%;"></div>
+							</div>
 						</div>
 						<div class="ticks" aria-hidden="true">
 							<span style="left:0%"></span><label style="left:0%">-3</label>
