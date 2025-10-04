@@ -21,6 +21,16 @@
             body::before{content:'Please rotate your device to portrait';position:fixed;inset:0;background:#0f0f10;color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1rem;z-index:9999}
             #main-content{display:none !important}
         }
+    /* Confetti + modal styles */
+    #confetti-canvas { position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:9999; }
+    .quiz-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.65); display:none; align-items:center; justify-content:center; z-index:800; }
+    .quiz-modal-overlay[aria-hidden="false"] { display:flex; }
+    .quiz-modal { width:100%; max-width:420px; background:#18181a; border:1px solid #2e2e31; border-radius:20px; padding:28px 26px 30px; text-align:center; box-shadow:0 10px 38px -10px rgba(0,0,0,0.6); font-family:Inter, Arial, sans-serif; }
+    .quiz-modal h2 { font-family:Montserrat, sans-serif; font-size:26px; margin:0 0 10px; letter-spacing:.5px; }
+    .quiz-modal p { margin:0 0 18px; color:#d0d0d4; line-height:1.4; }
+    .quiz-modal .actions { display:flex; gap:12px; justify-content:center; }
+    .quiz-btn { flex:1; padding:14px 18px; border-radius:14px; font-weight:600; border:1px solid #ff3b3f; background:#ff3b3f; color:#fff; cursor:pointer; font-size:15px; }
+    .quiz-btn.secondary { background:transparent; border-color:#444; color:#eee; }
     </style>
 </head>
 <body class="min-h-screen bg-bg text-white font-sans overflow-hidden">
@@ -50,6 +60,29 @@
             <button id="prevBtn" class="w-full h-14 rounded-xl border border-white/10 bg-transparent text-white/60 font-bold disabled:opacity-50">Previous</button>
             <button id="nextBtn" class="w-full h-16 rounded-xl font-bold text-white bg-gradient-to-r from-[#ff6b6b] to-[#e23b3b] disabled:opacity-45">Next →</button>
         </nav>
+    </div>
+
+    <!-- Confetti Canvas -->
+    <canvas id="confetti-canvas" aria-hidden="true"></canvas>
+    <!-- Pass Modal -->
+    <div id="quiz-pass-modal" class="quiz-modal-overlay" aria-hidden="true" role="dialog" aria-labelledby="quizPassHeading" aria-modal="true">
+        <div class="quiz-modal">
+            <h2 id="quizPassHeading">Congratulations! 🎉</h2>
+            <p id="quizPassMsg">You've completed this lesson.</p>
+            <div class="actions">
+                <button id="quizContinueBtn" class="quiz-btn">Continue</button>
+            </div>
+        </div>
+    </div>
+    <!-- Fail Modal -->
+    <div id="quiz-fail-modal" class="quiz-modal-overlay" aria-hidden="true" role="dialog" aria-labelledby="quizFailHeading" aria-modal="true">
+        <div class="quiz-modal">
+            <h2 id="quizFailHeading">Try Again</h2>
+            <p id="quizFailMsg">You need at least 4 correct answers to pass. Retake the quiz to improve your result.</p>
+            <div class="actions">
+                <button id="quizRetakeBtn" class="quiz-btn" style="background:#2f2f33;border-color:#444;">Retake Quiz</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -117,17 +150,74 @@
         }
 
         prevBtn.addEventListener('click', ()=>{ if(idx>0){ idx--; render(); } });
+    // Completion feedback + confetti (pass requires >=4 correct)
+        let submitted = false;
+        function launchConfetti(durationMs = 4000){
+            const canvas = document.getElementById('confetti-canvas');
+            if(!canvas) return; const ctx = canvas.getContext('2d');
+            function fit(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+            fit(); window.addEventListener('resize', fit);
+            const colors = ['#ff3b3f','#ff6b6b','#ffffff','#ffd54a','#ff9f43'];
+            const pieces = Array.from({length:160}, ()=>({
+                x: Math.random()*canvas.width,
+                y: -20 - Math.random()*canvas.height,
+                r: 6+Math.random()*10,
+                c: colors[Math.floor(Math.random()*colors.length)],
+                vy: 2+Math.random()*4,
+                vx: -2+Math.random()*4,
+                rot: Math.random()*Math.PI*2,
+                vr: -0.3+Math.random()*0.6
+            }));
+            let running = true; const endTime = performance.now()+durationMs;
+            (function frame(t){
+                if(!running) return; ctx.clearRect(0,0,canvas.width,canvas.height);
+                pieces.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.rot+=p.vr; if(p.y>canvas.height+40) { p.y=-20; p.x=Math.random()*canvas.width; }
+                    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillStyle=p.c; ctx.beginPath(); ctx.rect(-p.r/2,-p.r/2,p.r,p.r); ctx.fill(); ctx.restore(); });
+                if(t < endTime){ requestAnimationFrame(frame); } else { running=false; ctx.clearRect(0,0,canvas.width,canvas.height); }
+            })(performance.now());
+        }
+
+        function openPassModal(){
+            const modal = document.getElementById('quiz-pass-modal');
+            if(!modal) return; modal.setAttribute('aria-hidden','false');
+            const msg = document.getElementById('quizPassMsg');
+            if(msg) msg.textContent = 'Great job completing the quiz!';
+            launchConfetti();
+            const btn = document.getElementById('quizContinueBtn');
+            if(btn){ btn.onclick = ()=>{ modal.setAttribute('aria-hidden','true'); proceedToResults(); }; }
+        }
+
+        function openFailModal(){
+            const modal = document.getElementById('quiz-fail-modal');
+            if(!modal) return; modal.setAttribute('aria-hidden','false');
+            const retake = document.getElementById('quizRetakeBtn');
+            if(retake){
+                retake.onclick = ()=>{
+                    modal.setAttribute('aria-hidden','true');
+                    // reset quiz state
+                    for(let i=0;i<answers.length;i++) answers[i] = null;
+                    idx = 0; submitted = false;
+                    try{ localStorage.removeItem('quiz4_answers'); localStorage.removeItem('quiz4_score'); localStorage.removeItem('quiz4_total'); localStorage.removeItem('quiz4_passed'); }catch(e){}
+                    render();
+                };
+            }
+        }
+
+        function proceedToResults(){ window.location.href = 'results/quiz4-result.html'; }
+
         nextBtn.addEventListener('click', ()=>{
             if(idx < quiz.length-1){ idx++; render(); return; }
-            // Submit (store score + answers and go to results)
+            if(submitted) return; submitted = true;
+            const key = [3,3,0,2,2];
+            const score = answers.reduce((acc,ans,i)=> acc + (ans===key[i]?1:0), 0);
+            const passed = score >= 4; // 4 or 5 out of 5
             try{
-                const key = [3,3,0,2,2]; // d,d,a,c,c
-                const score = answers.reduce((acc,ans,i)=> acc + (ans===key[i]?1:0), 0);
                 localStorage.setItem('quiz4_answers', JSON.stringify(answers));
                 localStorage.setItem('quiz4_score', String(score));
                 localStorage.setItem('quiz4_total', String(quiz.length));
-            }catch(e){ console.warn('localStorage unavailable', e); }
-            window.location.href = 'results/quiz4-result.html';
+                localStorage.setItem('quiz4_passed', String(passed));
+            }catch(e){}
+            if(passed){ openPassModal(); } else { openFailModal(); }
         });
 
         render();
