@@ -897,12 +897,9 @@
 					const user = getCurrentValues();
 					if(gl && programs) renderGL(user); else scheduleApply();
 					const result = evaluateUserLevel3(user);
-					openResultModal({ ok: result.withinTolerance, user, ideal: IDEAL_LEVEL3, result });
-					if(!result.withinTolerance){
-						const diff = result.delta;
-						const msg = diff > 0 ? 'Image likely overexposed by ~' + diff.toFixed(2) + ' stops.' : 'Image likely underexposed by ~' + Math.abs(diff).toFixed(2) + ' stops.';
-						flMessage.textContent = msg + ' Adjust ISO/aperture/shutter.';
-					}
+					// Oblique lighting requirement: must be exactly 30° in addition to exposure margin
+					result.correctOblique = (user.oblique === '30');
+					openResultModal({ ok: result.withinTolerance && result.correctOblique, user, ideal: IDEAL_LEVEL3, result });
 				});
 
 				// Reset restores defaults and original image
@@ -1078,35 +1075,37 @@
 			// Get the next level button
 			const nextBtn = document.getElementById('fl-next');
 			
-			// Prioritize margin of error check for icon and message
-			if(result && result.withinMarginOfError) {
-				// All settings within margin - show success
+			// Evaluate combined pass condition: exposure margin + correct oblique (30°)
+			const passesExposure = !!(result && result.withinMarginOfError);
+			const passesOblique = !!(result && result.correctOblique);
+			const fullPass = passesExposure && passesOblique;
+			if(fullPass){
 				flIcon.className = 'fl-icon success';
 				flIcon.innerHTML = '<i class="fa-solid fa-circle-check" aria-hidden="true"></i>';
 				flHeading.textContent = 'Success!';
-				flMessage.textContent = 'Perfect! The details are clearly documented.';
+				flMessage.textContent = 'Great work! Proper exposure AND 30° oblique lighting captured.';
 			} else {
-				// Settings outside margin - show try again
 				flIcon.className = 'fl-icon fail';
 				flIcon.innerHTML = '<i class="fa-solid fa-circle-xmark" aria-hidden="true"></i>';
 				flHeading.textContent = 'Try Again';
-				
-				if(result && !result.withinMarginOfError) {
-					// Add specific feedback about what's out of range
-					let errorMsg = 'Settings outside acceptable range: ';
-					let errors = [];
-					if(!result.apertureInRange) errors.push('aperture (±1.0)');
-					if(!result.shutterInRange) errors.push('shutter speed (±100)');
-					if(!result.isoInRange) errors.push('ISO (±100)');
-					errorMsg += errors.join(', ');
-					flMessage.textContent = errorMsg;
-				} else {
-					flMessage.textContent = 'The image is not correctly exposed. Adjust and try again.';
+				let msgs = [];
+				if(!passesExposure){
+					let errorMsg = 'Exposure outside acceptable range:';
+					let details = [];
+					if(result && !result.apertureInRange) details.push('aperture (±1.0)');
+					if(result && !result.shutterInRange) details.push('shutter (±100)');
+					if(result && !result.isoInRange) details.push('ISO (±100)');
+					if(details.length) errorMsg += ' ' + details.join(', ');
+					msgs.push(errorMsg);
 				}
+				if(!passesOblique){
+					msgs.push('Select 30° Oblique Lighting to reveal detail.');
+				}
+				flMessage.textContent = msgs.join(' ');
 			}
 			
-			// Enable/disable next button based on margin of error
-			if(result && !result.withinMarginOfError) {
+			// Enable/disable next button based on combined requirement
+			if(!(passesExposure && passesOblique)) {
 				nextBtn.style.opacity = '0.5';
 				nextBtn.style.pointerEvents = 'none';
 				nextBtn.style.cursor = 'not-allowed';
@@ -1122,7 +1121,7 @@
 			const settingsContainer = document.querySelector('.fl-settings');
 			const idealCol = settingsContainer.querySelector('.fl-col:last-child'); // Second column (Ideal Settings)
 			
-			if(result && !result.withinMarginOfError) {
+			if(!(passesExposure && passesOblique)) {
 				// Hide ideal settings when outside margin of error
 				if(idealCol) idealCol.style.display = 'none';
 				// Center the user settings column
@@ -1278,7 +1277,7 @@
 			<svg viewBox="0 0 32 32"><path d="M20.7 25.3a1 1 0 0 1-1.4 0l-8-8a1 1 0 0 1 0-1.4l8-8a1 1 0 1 1 1.4 1.4L13.42 16l7.3 7.3a1 1 0 0 1 0 1.4z"/></svg>
 		</button>
 		<div class="level-title">Level 3: Blood</div>
-		<div class="task-box">Task: Take a properly exposed photo of the scene with the evidence marker included.</div>
+		<div class="task-box">Task: Take a properly exposed photo of the scene with the evidence marker included using 30° oblique lighting.</div>
 	</div>
 	<div id="main-content">
 			<div class="flex-row">
